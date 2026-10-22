@@ -65,7 +65,60 @@ function practicePaymentConfirm() {
   return practicePage(`<h2 class="tp-page-title">支払い内容を確認してください</h2><section class="tp-box"><h3 class="tp-area-title">お支払い方法</h3><div class="tp-box-body">${method}</div></section>${practiceBill('支払い明細')}${practiceData.payMethod === 'card' ? `<section class="tp-box"><h3 class="tp-area-title">今回お支払いのカード情報</h3><div class="tp-box-body"><label>クレジットカード番号</label><p>************${practiceData.cardChoice === 'saved' ? '4242' : practiceEscape(practiceData.cardNumber.slice(-4))}</p></div></section>` : ''}<div class="tp-actions">${practiceButton('finish-practice','この内容で申込する')}${practiceButton('confirm-back','戻る',true)}</div>`,2);
 }
 
+// Mouse menus align the placeholder row with the original field, independently of cursor position.
+let practiceMenuClose = null;
+function practiceMenuTop(rect, rowHeight = 28) {
+  return rect.top + rect.height / 2 - rowHeight * 1.5 - 5;
+}
+$('practice-stage').addEventListener('pointerdown', event => {
+  if (event.target.closest('.tp-select-menu')) return;
+  practiceMenuClose?.();
+  const select = event.target.closest('#practice-performance, #practice-seat');
+  if (!select || event.pointerType !== 'mouse' || event.button !== 0) return;
+  event.preventDefault(); event.stopPropagation();
+  const rect = select.getBoundingClientRect();
+  const menu = document.createElement('div');
+  menu.className = 'tp-select-menu'; menu.setAttribute('role', 'listbox');
+  menu.setAttribute('aria-label', select.id === 'practice-performance' ? '公演' : '席種');
+  menu.style.left = `${rect.left}px`; menu.style.width = `${rect.width}px`;
+  menu.style.top = `${practiceMenuTop(rect)}px`;
+  const options = [...select.options];
+  menu.innerHTML = options.map((option, index) => `<div role="option" tabindex="-1" data-option-index="${index}" aria-selected="${option.selected}">${practiceEscape(option.textContent) || '&nbsp;'}</div>`).join('');
+  select.setAttribute('aria-expanded', 'true');
+  $('practice-stage').append(menu);
+  const close = () => {
+    menu.remove(); select.removeAttribute('aria-expanded');
+    document.removeEventListener('pointerdown', outside);
+    $('practice-session').removeEventListener('scroll', close);
+    window.removeEventListener('resize', close);
+    practiceMenuClose = null;
+  };
+  const outside = event => { if (!menu.contains(event.target)) close(); };
+  const choose = index => {
+    select.selectedIndex = index; close();
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    $(select.id).focus();
+  };
+  menu.addEventListener('click', event => {
+    const option = event.target.closest('[data-option-index]');
+    if (option) choose(Number(option.dataset.optionIndex));
+  });
+  menu.addEventListener('keydown', event => {
+    const index = Number(document.activeElement.dataset.optionIndex);
+    if (event.key === 'Escape' || event.key === 'Tab') { close(); select.focus(); if (event.key === 'Escape') event.preventDefault(); }
+    else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault(); menu.children[Math.max(0, Math.min(options.length - 1, index + (event.key === 'ArrowDown' ? 1 : -1)))].focus();
+    } else if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(index); }
+  });
+  document.addEventListener('pointerdown', outside);
+  $('practice-session').addEventListener('scroll', close);
+  window.addEventListener('resize', close);
+  practiceMenuClose = close;
+  menu.children[Math.max(1, select.selectedIndex)].focus();
+});
+
 function renderPractice() {
+  practiceMenuClose?.();
   $('practice-current-label').textContent = practiceLabels[practiceRun.stage];
   $('practice-stage').innerHTML = ({ queue: practiceQueue, login: practiceLogin, registration: practiceRegistration, ticket: practiceTicket, 'order-confirm': practiceOrderConfirm, payment: practicePayment, 'payment-confirm': practicePaymentConfirm })[practiceRun.stage]();
   if (practiceRun.stage === 'ticket' && !practiceData.quantity) $('practice-quantity').selectedIndex = -1;

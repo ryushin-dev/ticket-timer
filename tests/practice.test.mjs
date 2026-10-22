@@ -60,3 +60,11 @@ test('SHADOWSは支払い方法未選択から開き、登録カード選択済�
  h.change('','convenience','practice-pay-method');assert.equal(vm.runInContext('practiceData.payMethod',h.context),'card');
  h.action('payment-next');assert.equal(h.stage(),'payment-confirm');assert.match(h.get('practice-stage').innerHTML,/¥32,310/);assert.equal(h.calls(),0);
 });
+
+test('公演・席種メニューの2行目が選択枠の中央に重なる',async()=>{
+ const h=await uiHarness();
+ for (const height of [30,45,60]) {
+   const top=vm.runInContext(`practiceMenuTop({top:200,height:${height}})`,h.context);
+   assert.equal(top+5+28+14,200+height/2);
+ }
+});
