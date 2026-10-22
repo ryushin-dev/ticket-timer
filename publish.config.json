@@ -1,0 +1,7 @@
+{
+  "owner": "ryushin-dev",
+  "repository": "ticket-timer",
+  "branch": "main",
+  "publishDirectory": "dist",
+  "expectedPagesUrl": "https://ryushin-dev.github.io/ticket-timer/"
+}

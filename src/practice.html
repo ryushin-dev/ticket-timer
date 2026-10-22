@@ -1,0 +1,14 @@
+<section id="panel-practice" role="tabpanel" aria-labelledby="tab-practice" hidden>
+<div class="card practice-intro"><h2>イメトレ</h2><p>待合室 → ログイン → 登録情報の確認 → 公演申込 → 申込内容の確認 → クレカ支払い → 支払い内容の確認までを練習します。</p>
+<p class="help">siteの写真と「公演申し込み.html」の広島公演を再現します。予約タブの設定とは独立した練習です。個人情報・登録済みカードはダミーに置き換えています。金額・手数料は練習用です。最後の「この内容で申込する」は練習終了の操作になります。</p>
+<div class="practice-options">
+<label class="wait-option">待合室の練習時間 <input id="practice-wait" type="number" min="0" max="60" step="0.1" value="3" inputmode="decimal"> 秒</label>
+<label><input id="practice-skip-login" type="checkbox">ログイン済みとして進める</label>
+<label><input id="practice-prefill" type="checkbox" checked>ID・パスワードを入力済みにする</label>
+</div><div class="practice-launch"><button id="practice-start" type="button" class="primary">イメトレを開始</button><span>練習用の入力だけを使ってください。ログイン・申込・決済の通信は行いません。</span></div><p id="practice-start-note" class="help" role="status"></p></div>
+<div id="practice-session" hidden aria-label="チケプラ操作の練習">
+<aside class="practice-toolbar" aria-label="練習タイマー"><span class="simulation-tag">イメトレ</span><strong id="practice-current-label">待合室</strong><div class="practice-clocks"><div><small>全体</small><output id="practice-total-clock">0.000秒</output></div><div><small>この画面</small><output id="practice-step-clock">0.000秒</output></div></div><button type="button" id="practice-fill" hidden>ダミー入力</button><button type="button" id="practice-stop">中止</button></aside>
+<div id="practice-stage" class="practice-stage"></div>
+</div>
+<section id="practice-result" class="card practice-result" aria-labelledby="practice-result-heading" hidden><h2 id="practice-result-heading">練習結果</h2><p id="practice-result-note" class="help"></p><div id="practice-metrics" class="practice-metrics"></div><table class="practice-laps"><thead><tr><th scope="col">画面</th><th scope="col" style="text-align:right">操作時間</th></tr></thead><tbody id="practice-laps"></tbody></table><div class="actions"><button type="button" id="practice-again" class="primary">もう一度練習する</button></div></section>
+</section>

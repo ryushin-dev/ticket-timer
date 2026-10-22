@@ -1,0 +1,12 @@
+{
+  "name": "ticket-pages",
+  "private": true,
+  "scripts": {
+    "preview": "node scripts/serve.mjs --source",
+    "build": "node scripts/build.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "verify-public": "node scripts/verify-public.mjs",
+    "serve": "node scripts/serve.mjs"
+  },
+  "engines": { "node": ">=20" }
+}
