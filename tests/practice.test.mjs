@@ -18,7 +18,7 @@ test('ログイン済みでも登録情報を確認し、中止後は最初か�
 });
 async function uiHarness(options={}) {
  let now=0, calls=0; const elements=new Map(), bodyClasses=new Set();
- const get=id=>{if(!elements.has(id))elements.set(id,{id,value:'',checked:false,hidden:false,dataset:{},style:{},listeners:{},textContent:'',innerHTML:'',disabled:false,addEventListener(type,cb){(this.listeners[type] ||= []).push(cb);},setAttribute(n,v){this[n]=v;},scrollIntoView(){},focus(){},querySelector(){return null;},querySelectorAll(){return [];}});return elements.get(id);};
+ const get=id=>{if(!elements.has(id))elements.set(id,{id,value:'',checked:false,hidden:false,dataset:{},style:{},listeners:{},textContent:'',innerHTML:'',disabled:false,contentWindow:{postMessage(){}},addEventListener(type,cb){(this.listeners[type] ||= []).push(cb);},setAttribute(n,v){this[n]=v;},scrollIntoView(){},focus(){},querySelector(){return null;},querySelectorAll(){return [];}});return elements.get(id);};
  get('practice-wait').value='0';get('practice-prefill').checked=options.prefill!==false;
  const context=vm.createContext({$:get,job:null,Date,performance:{now:()=>now},document:{activeElement:null,body:{classList:{add(x){bodyClasses.add(x);},remove(x){bodyClasses.delete(x);}}}},setInterval(){return 1;},clearInterval(){},fetch(){calls++;throw Error('forbidden');},location:{assign(){calls++;throw Error('forbidden');}}});
  const html=await assemble(), scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];vm.runInContext(scripts[2][1]+'\n'+scripts[3][1],context);
@@ -69,18 +69,26 @@ test('公演・席種メニューの2行目が選択枠の中央に重なる',as
  }
 });
 
-test('受付ページは時刻後のリロードでのみ開き、待合室と同意を経て進む',async()=>{
+test('ツアーから受付ページ・待合室へ進み、待合室後は従来どおり進む',async()=>{
  const h=await uiHarness();h.get('practice-from-tour').checked=true;h.get('practice-launch-seconds').value='2';h.get('practice-skip-login').checked=true;h.start();
- assert.equal(h.stage(),'tour');assert.doesNotMatch(h.get('practice-stage').innerHTML,/data-practice-action="tour-apply"/);
- h.action('tour-apply');assert.equal(h.stage(),'tour');
- h.advance(1999);h.get('practice-reload').listeners.click[0]();assert.doesNotMatch(h.get('practice-stage').innerHTML,/data-practice-action="tour-apply"/);
- h.advance(1);vm.runInContext('updatePracticeClocks()',h.context);assert.match(h.get('practice-countdown').textContent,/開始から/);assert.doesNotMatch(h.get('practice-stage').innerHTML,/data-practice-action="tour-apply"/);
- h.advance(100);h.get('practice-reload').listeners.click[0]();assert.match(h.get('practice-stage').innerHTML,/data-practice-action="tour-apply"/);
- h.action('tour-apply');assert.equal(h.stage(),'queue');vm.runInContext('practiceRun.tick() && renderPractice()',h.context);assert.equal(h.stage(),'consent');h.action('ticket-next');assert.equal(h.stage(),'consent');h.action('consent-next');assert.equal(h.stage(),'registration');h.action('registration-next');assert.equal(h.stage(),'ticket');
+ assert.equal(h.stage(),'tour');h.action('tour-apply');assert.equal(h.stage(),'tour');
+ h.advance(1999);h.get('practice-reload').listeners.click[0]();assert.equal(vm.runInContext('practiceRun.applicationVisible',h.context),false);
+ h.advance(1);vm.runInContext('updatePracticeClocks()',h.context);assert.equal(vm.runInContext('practiceRun.applicationVisible',h.context),false);
+ h.advance(100);h.get('practice-reload').listeners.click[0]();assert.equal(vm.runInContext('practiceRun.applicationVisible',h.context),true);
+ h.action('tour-apply');assert.equal(h.stage(),'reception');vm.runInContext("advancePractice('reception')",h.context);assert.equal(h.stage(),'queue');vm.runInContext('practiceRun.tick() && renderPractice()',h.context);assert.equal(h.stage(),'registration');
  assert.equal(vm.runInContext('practiceRun.result().operationMs',h.context),100);assert.equal(h.calls(),0);
- h.get('practice-stop').listeners.click[0]();h.start();assert.equal(h.stage(),'tour');assert.doesNotMatch(h.get('practice-stage').innerHTML,/data-practice-action="tour-apply"/);
+ h.get('practice-stop').listeners.click[0]();h.start();assert.equal(h.stage(),'tour');assert.equal(vm.runInContext('practiceRun.applicationVisible',h.context),false);
 });
-test('受付ページモードでも未ログインの場合は同意後にログインする',()=>{
- const h=runModel();h.run.start({fromTour:true,launchSeconds:1,waitSeconds:1});h.advance(1000);assert.equal(h.run.reloadTour(),true);h.run.advance('tour');h.advance(999);assert.equal(h.run.tick(),false);h.advance(1);assert.equal(h.run.tick(),true);assert.equal(h.run.stage,'consent');h.run.advance('consent');assert.equal(h.run.stage,'login');
+test('未ログインの場合は待合室の直後にログインする',()=>{
+ const h=runModel();h.run.start({fromTour:true,launchSeconds:1,waitSeconds:1});h.advance(1000);assert.equal(h.run.reloadTour(),true);h.run.advance('tour');assert.equal(h.run.stage,'reception');h.run.advance('reception');h.advance(999);assert.equal(h.run.tick(),false);h.advance(1);assert.equal(h.run.tick(),true);assert.equal(h.run.stage,'login');
  for(const launchSeconds of [-1,301,NaN])assert.throws(()=>h.run.start({fromTour:true,launchSeconds}),/0〜300秒/);
+});
+test('再現ページは元のCSS・画像を内蔵し、外部通信・本物の購入へ遷移しない',()=>{
+ const pages=JSON.parse(readFileSync(new URL('../src/assets/shadows-reference/pages.json',import.meta.url),'utf8'));
+ for(const html of Object.values(pages)){
+  assert.match(html,/connect-src 'none'/);assert.match(html,/form-action 'none'/);
+  assert.doesNotMatch(html,/<script[^>]+src=|<iframe|src=["']https?:/i);
+  assert.match(html,/data:image/);
+ }
+ assert.match(pages.tour,/opacity: 0.5/);assert.match(pages.reception,/確認しました/);assert.match(pages.reception,/practice-reception-apply/);
 });

@@ -13,7 +13,8 @@ export async function assemble() {
     if (!/^\d*$/.test(value) || /[<>"&]/.test(label)) throw new Error('国選択の形式が無効です');
     return `<option value="${value}">${label}</option>`;
   }).join('');
-  const practice = practiceScript.replace('/* PRACTICE_LOGO */', () => image(logo)).replace('/* PRACTICE_CHECK_ICON */', () => image(check)).replace('/* PRACTICE_COUNTRY_OPTIONS */', () => JSON.stringify(countryOptions)).replace('/* PRACTICE_QUEUE_ART */', () => image(queueArt));
+  const referencePages = await readFile(path.join(root, 'src/assets/shadows-reference/pages.json'), 'utf8');
+  const practice = practiceScript.replace('/* PRACTICE_REFERENCE_PAGES */', () => JSON.stringify(JSON.parse(referencePages)).replace(/</g, '\\u003c')).replace('/* PRACTICE_LOGO */', () => image(logo)).replace('/* PRACTICE_CHECK_ICON */', () => image(check)).replace('/* PRACTICE_COUNTRY_OPTIONS */', () => JSON.stringify(countryOptions)).replace('/* PRACTICE_QUEUE_ART */', () => image(queueArt));
   return template.replace('/* CORE_SCRIPT */', () => core).replace('/* APP_SCRIPT */', () => app)
     .replace('/* PRACTICE_STYLE */', () => practiceCss).replace('<!-- PRACTICE_PANEL -->', () => practiceHtml)
     .replace('/* PRACTICE_MODEL_SCRIPT */', () => practiceModel).replace('/* PRACTICE_SCRIPT */', () => practice);

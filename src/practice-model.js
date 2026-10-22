@@ -19,7 +19,7 @@ class TicketPracticeRun {
   stageElapsed() { return this.status !== 'running' ? 0 : Math.max(0, this.clock() - this.enteredAt); }
   advance(expectedStage) {
     if (this.status !== 'running' || this.stage !== expectedStage) return false;
-    const next = { tour: this.applicationVisible ? 'queue' : null, queue: this.fromTour ? 'consent' : (this.skipLogin ? 'registration' : 'login'), consent: this.skipLogin ? 'registration' : 'login', login: 'registration', registration: 'ticket', ticket: 'order-confirm', 'order-confirm': 'payment', payment: 'payment-confirm' }[this.stage];
+    const next = { tour: this.applicationVisible ? 'reception' : null, reception: 'queue', queue: this.skipLogin ? 'registration' : 'login', login: 'registration', registration: 'ticket', ticket: 'order-confirm', 'order-confirm': 'payment', payment: 'payment-confirm' }[this.stage];
     if (!next) return false;
     const now = this.clock(); this.laps.push({ stage: this.stage, milliseconds: Math.max(0, now - this.enteredAt) });
     this.stage = next; this.enteredAt = now;
