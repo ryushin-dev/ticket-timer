@@ -9,7 +9,9 @@ npm run build
 npm run verify-public
 ```
 
-パスワード入力は不要です。`dist/index.html` と `dist/.nojekyll` のみを公開用リポジトリ `ryushin-dev/ticket-timer` の `main` ルートに配置します。参考資料の `site/` やHAR、開発フォルダはアップロードしません。公開URLは https://ryushin-dev.github.io/ticket-timer/ です。
+パスワード入力は不要です。ビルドは `dist/` に加え、リポジトリのルートにも `index.html` と `.nojekyll` を生成します。変更後に `npm run build` を実行し、生成されたルートの2ファイルもコミット・pushしてください。GitHub Pagesは `main` の `/ (root)` を公開します。`dist/` はGit対象外です。
+
+参考資料の `site/` やHARはアップロードしません。公開URLは https://ryushin-dev.github.io/ticket-timer/ です。
 
 ```sh
 npm run preview

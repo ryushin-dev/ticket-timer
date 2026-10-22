@@ -35,6 +35,11 @@ export async function buildPlain(output = path.join(root, 'dist')) {
   return output;
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  try { console.log(`公開用HTMLを生成しました: ${await buildPlain()}`); }
+  try {
+    const output = await buildPlain();
+    await writeFile(path.join(root, 'index.html'), await readFile(path.join(output, 'index.html')));
+    await writeFile(path.join(root, '.nojekyll'), '');
+    console.log(`公開用HTMLを生成しました: ${output}（GitHub Pages用にルートにも配置済み）`);
+  }
   catch (error) { console.error(error.message); process.exitCode = 1; }
 }
