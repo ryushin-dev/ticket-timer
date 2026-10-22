@@ -40,6 +40,9 @@ body.practice-active{overflow:hidden}body.practice-active main>header,body.pract
 .tp-select-menu [role=option]{height:28px;padding:0 10px 0 22px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:default;position:relative;outline:none}
 .tp-select-menu [role=option][aria-selected=true]:before{content:'✓';position:absolute;left:5px}
 .tp-select-menu [role=option]:hover,.tp-select-menu [role=option]:focus{background:#4389ec;color:white}
+
+#practice-launch-timer{border-top:1px solid #ddd;margin-top:6px;padding-top:6px}#practice-launch-timer small{font-size:10px}#practice-countdown{display:block;font:12px/1.8 ui-monospace,monospace;color:#b34835}
+.tp-tour{min-height:100vh;background:#e7e3d9;color:#342a25;font-family:Georgia,"Hiragino Mincho ProN",serif}.tp-tour header{display:flex;justify-content:space-between;padding:24px 5%;margin:0;border-bottom:1px solid #756d60}.tp-tour-hero{text-align:center;padding:70px 20px;background:#342b27;color:#e9dfcb}.tp-tour-hero h1{font-size:clamp(40px,10vw,100px);letter-spacing:.12em;margin:20px 0}.tp-tour-ticket{max-width:740px;margin:auto;padding:40px 24px 80px}.tp-tour-ticket h2{text-align:center;font-size:32px}.tp-tour-ticket h3{font-size:22px;margin:28px 0}.tp-tour-ticket dl{line-height:1.8}.tp-tour-ticket dt{font-weight:bold;margin-top:22px}.tp-tour-ticket dd{margin:6px 0 22px}.tp-tour-ticket .tp-primary{background:#342b27;border-color:#342b27;color:#fff;width:100%;margin:30px 0}.tp-tour-pending{border:1px solid #a49a8b;text-align:center;padding:18px;color:#786f62;margin:30px 0!important}#practice-reload-note{font-size:13px;margin:12px 0;color:#98523e}
 </style>
 </head>
 <body><main>
@@ -85,14 +88,17 @@ body.practice-active{overflow:hidden}body.practice-active main>header,body.pract
 </div></section>
 <section id="panel-practice" role="tabpanel" aria-labelledby="tab-practice" hidden>
 <div class="card practice-intro"><h2>イメトレ</h2><p>待合室 → ログイン → 登録情報の確認 → 公演申込 → 申込内容の確認 → クレカ支払い → 支払い内容の確認までを練習します。</p>
+<p class="help">「SHADOWSの受付ページから練習する」を選ぶと、目標時刻を過ぎて右上のリロード → 申込ボタン → 待合室 → 注意事項への同意から練習します。時刻を過ぎるだけでは申込ボタンは表示されません。</p>
 <p class="help">siteの写真と「公演申し込み.html」の広島公演を再現します。予約タブの設定とは独立した練習です。個人情報・登録済みカードはダミーに置き換えています。金額・手数料は練習用です。最後の「この内容で申込する」は練習終了の操作になります。</p>
 <div class="practice-options">
+<label><input id="practice-from-tour" type="checkbox">SHADOWSの受付ページから練習する</label>
+<label class="wait-option">目標時刻まで <input id="practice-launch-seconds" type="number" min="0" max="300" step="1" value="10"> 秒</label>
 <label class="wait-option">待合室の練習時間 <input id="practice-wait" type="number" min="0" max="60" step="0.1" value="3" inputmode="decimal"> 秒</label>
 <label><input id="practice-skip-login" type="checkbox">ログイン済みとして進める</label>
 <label><input id="practice-prefill" type="checkbox" checked>ID・パスワードを入力済みにする</label>
 </div><div class="practice-launch"><button id="practice-start" type="button" class="primary">イメトレを開始</button><span>練習用の入力だけを使ってください。ログイン・申込・決済の通信は行いません。</span></div><p id="practice-start-note" class="help" role="status"></p></div>
 <div id="practice-session" hidden aria-label="チケプラ操作の練習">
-<aside class="practice-toolbar" aria-label="練習タイマー"><span class="simulation-tag">イメトレ</span><strong id="practice-current-label">待合室</strong><div class="practice-clocks"><div><small>全体</small><output id="practice-total-clock">0.000秒</output></div><div><small>この画面</small><output id="practice-step-clock">0.000秒</output></div></div><button type="button" id="practice-fill" hidden>ダミー入力</button><button type="button" id="practice-stop">中止</button></aside>
+<aside class="practice-toolbar" aria-label="練習タイマー"><span class="simulation-tag">イメトレ</span><strong id="practice-current-label">待合室</strong><div class="practice-clocks"><div><small>全体</small><output id="practice-total-clock">0.000秒</output></div><div><small>この画面</small><output id="practice-step-clock">0.000秒</output></div></div><div id="practice-launch-timer" hidden><small>目標時刻 <span id="practice-target-time"></span></small><output id="practice-countdown" aria-live="off"></output><button type="button" id="practice-reload">リロード</button></div><button type="button" id="practice-fill" hidden>ダミー入力</button><button type="button" id="practice-stop">中止</button></aside>
 <div id="practice-stage" class="practice-stage"></div>
 </div>
 <section id="practice-result" class="card practice-result" aria-labelledby="practice-result-heading" hidden><h2 id="practice-result-heading">練習結果</h2><p id="practice-result-note" class="help"></p><div id="practice-metrics" class="practice-metrics"></div><table class="practice-laps"><thead><tr><th scope="col">画面</th><th scope="col" style="text-align:right">操作時間</th></tr></thead><tbody id="practice-laps"></tbody></table><div class="actions"><button type="button" id="practice-again" class="primary">もう一度練習する</button></div></section>
@@ -695,18 +701,25 @@ setInterval(() => {
 <script>// 写真で確認できる順序だけを再現する。通信や購入処理は持たない。
 class TicketPracticeRun {
   constructor(clock = () => performance.now()) { this.clock = clock; this.status = 'idle'; this.stage = null; this.laps = []; this.clicks = 0; }
-  start({ waitSeconds = 3, skipLogin = false } = {}) {
+  start({ waitSeconds = 3, skipLogin = false, fromTour = false, launchSeconds = 10 } = {}) {
     if (!Number.isFinite(waitSeconds) || waitSeconds < 0 || waitSeconds > 60) throw new Error('待合室の時間は0〜60秒で設定してください。');
+    if (!Number.isFinite(launchSeconds) || launchSeconds < 0 || launchSeconds > 300) throw new Error('目標時刻までの時間は0〜300秒で設定してください。');
+    this.fromTour = fromTour; this.launchSeconds = launchSeconds; this.applicationVisible = false;
     this.waitSeconds = waitSeconds; this.skipLogin = skipLogin;
     this.startedAt = this.clock(); this.enteredAt = this.startedAt; this.endedAt = null;
-    this.stage = 'queue'; this.status = 'running'; this.laps = []; this.clicks = 0;
+    this.stage = fromTour ? 'tour' : 'queue'; this.status = 'running'; this.laps = []; this.clicks = 0;
+  }
+  reloadTour() {
+    if (this.status !== 'running' || this.stage !== 'tour') return false;
+    this.applicationVisible = this.elapsed() >= this.launchSeconds * 1000;
+    return this.applicationVisible;
   }
   tap() { if (this.status === 'running') this.clicks++; }
   elapsed() { return this.status === 'idle' ? 0 : Math.max(0, (this.endedAt ?? this.clock()) - this.startedAt); }
   stageElapsed() { return this.status !== 'running' ? 0 : Math.max(0, this.clock() - this.enteredAt); }
   advance(expectedStage) {
     if (this.status !== 'running' || this.stage !== expectedStage) return false;
-    const next = { queue: this.skipLogin ? 'registration' : 'login', login: 'registration', registration: 'ticket', ticket: 'order-confirm', 'order-confirm': 'payment', payment: 'payment-confirm' }[this.stage];
+    const next = { tour: this.applicationVisible ? 'queue' : null, queue: this.fromTour ? 'consent' : (this.skipLogin ? 'registration' : 'login'), consent: this.skipLogin ? 'registration' : 'login', login: 'registration', registration: 'ticket', ticket: 'order-confirm', 'order-confirm': 'payment', payment: 'payment-confirm' }[this.stage];
     if (!next) return false;
     const now = this.clock(); this.laps.push({ stage: this.stage, milliseconds: Math.max(0, now - this.enteredAt) });
     this.stage = next; this.enteredAt = now;
@@ -727,14 +740,15 @@ class TicketPracticeRun {
   tick() { if (this.stage === 'queue' && this.status === 'running' && this.stageElapsed() >= this.waitSeconds * 1000) return this.advance('queue'); return false; }
   cancel() { if (this.status === 'running') { this.endedAt = this.clock(); this.status = 'cancelled'; } }
   result() {
-    const wait = this.laps.find(lap => lap.stage === 'queue')?.milliseconds ?? (this.stage === 'queue' ? this.elapsed() : 0);
+    let wait = this.laps.find(lap => lap.stage === 'queue')?.milliseconds ?? (this.stage === 'queue' ? this.elapsed() : 0);
+    if (this.fromTour) wait += Math.min(this.launchSeconds * 1000, this.laps.find(lap => lap.stage === 'tour')?.milliseconds ?? (this.stage === 'tour' ? this.elapsed() : 0));
     return { status: this.status, totalMs: this.elapsed(), waitMs: wait, operationMs: Math.max(0, this.elapsed() - wait), clicks: this.clicks, laps: this.laps.map(lap => ({ ...lap })) };
   }
 }
 </script>
 <script>const practiceRun = new TicketPracticeRun();
 let practiceTimer = null, practiceData = null, practiceFriendOpen = false, practiceFriendChoice = '';
-const practiceLabels = { queue: '仮想待合室', login: 'ログイン', registration: '登録情報の確認', ticket: '公演申込', 'order-confirm': '申込内容の確認', payment: 'クレカ支払い', 'payment-confirm': '支払い内容の確認' };
+const practiceLabels = { tour: 'SHADOWS受付ページ', consent: '注意事項への同意', queue: '仮想待合室', login: 'ログイン', registration: '登録情報の確認', ticket: '公演申込', 'order-confirm': '申込内容の確認', payment: 'クレカ支払い', 'payment-confirm': '支払い内容の確認' };
 const practiceDemo = Object.freeze({ id: 'E000000000000', password: 'practice-only', phone: '09000000000', email: 'demo@example.invalid', name: 'デモ タロウ', kana: 'デモ タロウ' });
 const practiceFriends = Object.freeze([{ key: 'demo-a', name: 'デモ ハナコ', id: 'E000000000001', phone: '***-****-0001' }, { key: 'demo-b', name: 'デモ ジロウ', id: 'E000000000002', phone: '***-****-0002' }]);
 const practiceLogo = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTQwIiBoZWlnaHQ9IjMyIiB2aWV3Qm94PSIwIDAgMTQwIDMyIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8bWFzayBpZD0ibWFzazBfMTNfNjQ1IiBzdHlsZT0ibWFzay10eXBlOmFscGhhIiBtYXNrVW5pdHM9InVzZXJTcGFjZU9uVXNlIiB4PSIxIiB5PSIxIiB3aWR0aD0iMzAiIGhlaWdodD0iMzAiPgo8cGF0aCBkPSJNMS42ODQwOCAxNi4wMTM5QzEuNjg0MDggMjMuOTI4NiA4LjA5MzE3IDMwLjM0NDUgMTUuOTk5NCAzMC4zNDQ1QzIzLjkwNjYgMzAuMzQ0NSAzMC4zMTU3IDIzLjkyODYgMzAuMzE1NyAxNi4wMTM5QzMwLjMxNTcgOC4xMDAwNCAyMy45MDY2IDEuNjg0MiAxNS45OTk0IDEuNjg0MkM4LjA5MzE3IDEuNjg0MiAxLjY4NDA4IDguMTAwMDQgMS42ODQwOCAxNi4wMTQ4VjE2LjAxMzlaIiBmaWxsPSJ3aGl0ZSIvPgo8L21hc2s+CjxnIG1hc2s9InVybCgjbWFzazBfMTNfNjQ1KSI+CjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNMjQuODg0NyAtMy4yNTMwNUwyMy41NDk2IDkuNTkwOTlIMzcuMzEzNUwzOC42NDc4IC0zLjI1MzA1SDI0Ljg4NDdaIiBmaWxsPSIjNThDNzlGIi8+CjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNLTUuMzEyMzMgMjIuNDM1Nkg4LjQ1MDc2TDcuMTE2NDggMzUuMjc4OEgtNi42NDc0NkwtNS4zMTIzMyAyMi40MzU2WiIgZmlsbD0iI0ZGQ0Y1NCIvPgo8cGF0aCBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZD0iTS0yLjY0MzYgLTMuMjUzMDVIMTEuMTE5OEw5Ljc4NTUgOS41OTEyOEgtMy45Nzg3NkwtMi42NDM2IC0zLjI1MzA1Wk0yMi4yMTQ2IDIyLjQzNTZIMzUuOTc3MkwzNC42NDI5IDM1LjI3OTlIMjAuODc4NkwyMi4yMTQ2IDIyLjQzNTZaIiBmaWxsPSIjQjA2NUU5Ii8+CjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNLTQuMDEwMTcgOS41NTU4NUwtNS4zNDg2NyAyMi40MzExTC01LjM1MjA1IDIyLjQ2OTlIOC40ODE5NEw5LjgxOTYgOS41OTQ2N0w5LjgyMzgyIDkuNTU1ODVILTQuMDEwMTdaIiBmaWxsPSIjRjY3MzJBIi8+CjxwYXRoIGZpbGwtcnVsZT0iZXZlbm9kZCIgY2xpcC1ydWxlPSJldmVub2RkIiBkPSJNOC40MTkwMyAyMi40TDcuMDgwNTIgMzUuMjc1Mkw3LjA3NzE1IDM1LjMxNDFIMjAuOTExMUwyMi4yNDg4IDIyLjQzODhMMjIuMjUzIDIyLjRIOC40MTkwM1oiIGZpbGw9IiNGNjczMkEiLz4KPHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0yMy41MTc1IDkuNTU1ODVMMjIuMTc5IDIyLjQzMTFMMjIuMTc0OCAyMi40Njk5SDM2LjAwOTZMMzcuMzQ3MyA5LjU5NDY3TDM3LjM1MDcgOS41NTU4NUgyMy41MTc1WiIgZmlsbD0iIzM0NUNDOCIvPgo8cGF0aCBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZD0iTTExLjA4ODUgLTMuMjg4NTdMOS43NDk5NiA5LjU4NzUzTDkuNzQ2NTggOS42MjU1MUgyMy41ODA2TDI0LjkxODIgLTMuMjQ5NzVMMjQuOTIyNCAtMy4yODg1N0gxMS4wODg1WiIgZmlsbD0iIzM0NUNDOCIvPgo8cGF0aCBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZD0iTTkuNzUzMTQgOS41NTU4NUw4LjQxNTQ5IDIyLjQzMTFMOC40MTIxMSAyMi40Njk5SDIyLjI0NTNMMjMuNTgzOCA5LjU5NDY3TDIzLjU4NzEgOS41NTU4NUg5Ljc1MzE0WiIgZmlsbD0iI0U5NDAyNCIvPgo8L2c+CjxwYXRoIGQ9Ik0yNC42MzUyIDEzLjUxMjhMMjMuMzI4NCAxMS45NzU0QzIyLjU1MjEgMTIuMzIxNyAyMS42MTE5IDEyLjEzMzkgMjEuMDMyNyAxMS40NTJDMjAuNDUyNyAxMC43NzA3IDIwLjQxNTMgOS44MDc5IDIwLjg3NzMgOS4wOTI1MkwxOS41NzMzIDcuNTU3OTVDMTkuMjA4OCA3LjEyOTE1IDE4LjU2ODEgNy4wNzg2NiAxOC4xNDIyIDcuNDQ0MTdMNi43NTU5OCAxNy4yMDYzQzYuMzI5MzMgMTcuNTcxOCA2LjI3OTE3IDE4LjIxNTQgNi42NDI5NiAxOC42NDM1TDcuOTQ5MDYgMjAuMTc5NUM4LjcyMzk2IDE5LjgzNzQgOS42NjA2MyAyMC4wMjY2IDEwLjIzODUgMjAuNzA1N0MxMC44MTYzIDIxLjM4NjIgMTAuODU1OCAyMi4zNDU1IDEwLjM5NzQgMjMuMDU5NUwxMS43MDQ5IDI0LjU5OUMxMi4wNjk0IDI1LjAyNzEgMTIuNzEwMSAyNS4wNzc2IDEzLjEzNjcgMjQuNzEyMUwyNC41MjIyIDE0Ljk0OTlDMjQuOTQ4OSAxNC41ODQ0IDI0Ljk5OSAxMy45NDA5IDI0LjYzNTIgMTMuNTEyOFpNMTAuNjEyMSAxNy4xMzk1TDEzLjc1NTUgMjAuODU4NkwyMC41Mjk3IDE1LjAxNjhMMTcuMzg3IDExLjI5NzdMMTAuNjEyMSAxNy4xNDAyVjE3LjEzOTVaTTIyLjAzNzkgMTUuMjQ5M0wxMy44MzQ2IDIyLjI4MjJDMTMuNzU2OSAyMi4zNDgzIDEzLjY0MDQgMjIuMzM5MSAxMy41NzQ3IDIyLjI2MDlMOS4yMjE5NyAxNy4xNDA5QzkuMTU1NTcgMTcuMDYzNCA5LjE2NTQ1IDE2Ljk0NjcgOS4yNDMxNiAxNi44Nzk5TDE3LjQ0NTcgOS44NDcwMUMxNy41MjM0IDkuNzgwMTcgMTcuNjM5OSA5Ljc5MDEyIDE3LjcwNTYgOS44Njc2NEwyMi4wNTg0IDE0Ljk4NzZDMjIuMTI0MSAxNS4wNjU5IDIyLjExNDkgMTUuMTgyNSAyMi4wMzcyIDE1LjI0OTMiIGZpbGw9ImJsYWNrIi8+CjxwYXRoIGQ9Ik0yNC42MzUyIDEzLjUxMjhMMjMuMzI4NCAxMS45NzU0QzIyLjU1MjEgMTIuMzIxNyAyMS42MTE5IDEyLjEzMzkgMjEuMDMyNyAxMS40NTJDMjAuNDUyNyAxMC43NzA3IDIwLjQxNTMgOS44MDc5IDIwLjg3NzMgOS4wOTI1MkwxOS41NzMzIDcuNTU3OTVDMTkuMjA4OCA3LjEyOTE1IDE4LjU2ODEgNy4wNzg2NiAxOC4xNDIyIDcuNDQ0MTdMNi43NTU5OCAxNy4yMDYzQzYuMzI5MzMgMTcuNTcxOCA2LjI3OTE3IDE4LjIxNTQgNi42NDI5NiAxOC42NDM1TDcuOTQ5MDYgMjAuMTc5NUM4LjcyMzk2IDE5LjgzNzQgOS42NjA2MyAyMC4wMjY2IDEwLjIzODUgMjAuNzA1N0MxMC44MTYzIDIxLjM4NjIgMTAuODU1OCAyMi4zNDU1IDEwLjM5NzQgMjMuMDU5NUwxMS43MDQ5IDI0LjU5OUMxMi4wNjk0IDI1LjAyNzEgMTIuNzEwMSAyNS4wNzc2IDEzLjEzNjcgMjQuNzEyMUwyNC41MjIyIDE0Ljk0OTlDMjQuOTQ4OSAxNC41ODQ0IDI0Ljk5OSAxMy45NDA5IDI0LjYzNTIgMTMuNTEyOFpNMTAuNjEyMSAxNy4xMzk1TDEzLjc1NTUgMjAuODU4NkwyMC41Mjk3IDE1LjAxNjhMMTcuMzg3IDExLjI5NzdMMTAuNjEyMSAxNy4xNDAyVjE3LjEzOTVaTTIyLjAzNzkgMTUuMjQ5M0wxMy44MzQ2IDIyLjI4MjJDMTMuNzU2OSAyMi4zNDgzIDEzLjY0MDQgMjIuMzM5MSAxMy41NzQ3IDIyLjI2MDlMOS4yMjE5NyAxNy4xNDA5QzkuMTU1NTcgMTcuMDYzNCA5LjE2NTQ1IDE2Ljk0NjcgOS4yNDMxNiAxNi44Nzk5TDE3LjQ0NTcgOS44NDcwMUMxNy41MjM0IDkuNzgwMTcgMTcuNjM5OSA5Ljc5MDEyIDE3LjcwNTYgOS44Njc2NEwyMi4wNTg0IDE0Ljk4NzZDMjIuMTI0MSAxNS4wNjU5IDIyLjExNDkgMTUuMTgyNSAyMi4wMzcyIDE1LjI0OTMiIGZpbGw9IiNGRUZFRkUiLz4KPHBhdGggZmlsbC1ydWxlPSJldmVub2RkIiBjbGlwLXJ1bGU9ImV2ZW5vZGQiIGQ9Ik0xMTEuODQ5IDcuOTQ4NTRDMTExLjg0OSA3LjE1ODUgMTExLjE5NCA2LjUxNzUgMTEwLjM4OCA2LjUxNzVDMTA5LjU4NCA2LjUxNzUgMTA4LjkyOSA3LjE1ODUgMTA4LjkyOSA3Ljk0ODU0QzEwOC45MjkgOC43Mzg1OCAxMDkuNTg0IDkuMzc5NTggMTEwLjM4OCA5LjM3OTU4QzExMS4xOTMgOS4zNzk1OCAxMTEuODQ5IDguNzM4NTggMTExLjg0OSA3Ljk0ODU0Wk0xMDUuOTIzIDcuMzM0NjNDMTA2LjE5OCA3LjM0NzMzIDEwNi42OCA3LjMzNzE3IDEwNy4wMTkgNy4zMTM0NlY3LjMxMjYyQzEwNy40MjMgNC45MjQ3MyAxMTAuNDA1IDMuNDA4MTYgMTEyLjk1NyA1LjUyNTkzQzExNC45MjIgOC4xODczMyAxMTMuMTEzIDExLjA5MTcgMTEwLjU3NyAxMS4yMjIyTDExMC41NDQgMTEuMzMzMUMxMDkuNDMzIDE2LjA0NDUgMTA3Ljg4MSAxOC40OTQyIDEwNS40NTYgMjEuMDY4NEMxMDIuMjcyIDI0LjQ0OTUgOTguMzk5MSAyNi40NzU5IDk2LjQwMzMgMjcuMzI5NEM5Ni4xMDE2IDI3LjQ1OSA5NS43NTE4IDI3LjM3NTEgOTUuNTYxNSAyNy4xMTAxTDkzLjk0OTggMjQuNzAwMkM5My43MDU1IDI0LjM1OTggOTMuODMxNSAyMy44ODczIDk0LjIxNTYgMjMuNzExMkM5NS4zMjU3IDIzLjE5OTcgOTcuMTc0OSAyMi4yMjQyIDk4Ljk1OCAyMS4wMUMxMDIuNzg3IDE4LjQwNDQgMTA0Ljk2MSAxNS4xNDEgMTA1Ljc0NSAxMS4zOTY2SDk1LjI3ODZDOTQuMTM3NyAxMS4zOTY2IDkzLjQwMjUgMTEuNDA2OSA5Mi43MDE0IDExLjQxNjhMOTIuNzAxMyAxMS40MTY4QzkyLjQ0MSAxMS40MjA1IDkyLjE4NTQgMTEuNDI0MSA5MS45MTU1IDExLjQyNzFDOTEuNTE4NiAxMS40MzEzIDkxLjE4MjUgMTEuMTU2OSA5MS4xODI1IDEwLjc3NjdMOTEuMTg2OCA3Ljk0MzQ2QzkxLjE4NjggNy41NjA3MiA5MS41Mjg5IDcuMjg0NjcgOTEuOTI4MyA3LjI5NTY4QzkyLjg5MTkgNy4zMjQ0NyA5My42OTY5IDcuMzQxNDEgOTUuMzI4MyA3LjM0MTQxTDEwNS45MjMgNy4zMzQ2M1pNMTI5LjY5NSA5LjkyMTgzSDEyMS40MzhDMTIwLjk2NSA5LjkyMTgzIDEyMC41MTIgOS45MjMxMSAxMjAuMDg4IDkuOTI0MzFIMTIwLjA4OEgxMjAuMDg4QzExOS42IDkuOTI1NjkgMTE5LjE1MSA5LjkyNjk3IDExOC43NTIgOS45MjYwNkMxMTguMzUgOS45MjUyMiAxMTguMDA5IDkuNjYwMTggMTE4LjAxIDkuMjc2NTlMMTE4LjAyNiA2LjcwMjQxQzExOC4wMjggNi4zMjU2IDExOC4zNiA2LjA1NjMzIDExOC43NTUgNi4wNTg4N0MxMTkuMjE3IDYuMDYyMzggMTE5Ljc3OSA2LjA2MTg1IDEyMC40ODIgNi4wNjExOEgxMjAuNDgySDEyMC40ODJDMTIwLjc5NiA2LjA2MDg5IDEyMS4xMzggNi4wNjA1NiAxMjEuNTEyIDYuMDYwNTZIMTI5LjY0NUMxMjkuODc3IDYuMDYwNTYgMTMwLjA5IDYuMDYwNzIgMTMwLjI4OCA2LjA2MDg3SDEzMC4yODhDMTMxLjMwMyA2LjA2MTYyIDEzMS45MTIgNi4wNjIwNyAxMzIuNDk5IDYuMDM5MzlDMTMyLjkwNCA2LjAyMzMgMTMzLjI1NCA2LjI5MzQyIDEzMy4yNTYgNi42Nzk1NUwxMzMuMjczIDkuMjY2NDNDMTMzLjI3NSA5LjY0NjYzIDEzMi45NCA5LjkyOTQ1IDEzMi41NDMgOS45MTc2QzEzMi4xMDIgOS45MDUwOCAxMzEuNjk0IDkuOTA4ODQgMTMxLjEzNCA5LjkxNDAyQzEzMC43NDcgOS45MTc1OSAxMzAuMjg4IDkuOTIxODMgMTI5LjY5NSA5LjkyMTgzWk0xMzMuNDUgMTIuMjI1QzEzMy43MDUgMTIuMjA1NiAxMzMuOTYyIDEyLjI0MTEgMTM0LjEzMiAxMi40M0wxMzUuNTc3IDEzLjk4OTdDMTM1Ljc1OSAxNC4xOTIxIDEzNS43OTIgMTQuNDc5MSAxMzUuNjc1IDE0LjcyNDdDMTM1LjYwNyAxNC44Njk0IDEzNS41NDUgMTUuMDM2MyAxMzUuNDY5IDE1LjI0MjRMMTM1LjQ2OSAxNS4yNDI4TDEzNS40NjkgMTUuMjQyOUMxMzUuMzk0IDE1LjQ0NjkgMTM1LjMwNSAxNS42ODkyIDEzNS4xODEgMTUuOTg2NEMxMzMuNzExIDE5LjQ5ODggMTMyLjA0NSAyMS45MjE0IDEyOS41MzYgMjMuOTExM0MxMjcuNDY2IDI1LjU1NCAxMjUuMTMzIDI2LjU1OTEgMTIyLjkyIDI3LjM3NDZDMTIyLjYyNiAyNy40ODMgMTIyLjI5OCAyNy4zODU2IDEyMi4xMTkgMjcuMTMxNkwxMjAuNDkxIDI0LjgxNTdDMTIwLjIzMyAyNC40NTI0IDEyMC4zOTcgMjMuOTUxMSAxMjAuODIyIDIzLjgwNzFDMTIyLjIwOCAyMy4zMzk3IDEyNC45MjggMjIuMTk3NCAxMjYuOTE4IDIwLjUzMjdDMTI4LjUwNiAxOS4yMDUgMTI5LjQxMiAxOC4yMTE3IDEzMC4zMjkgMTYuMTcxSDExOS42NDJDMTE4LjEzIDE2LjE3MSAxMTcuMTcxIDE2LjE4NDUgMTE2LjQxIDE2LjIzMTFDMTE2LjAxNyAxNi4yNTQ4IDExNS42ODggMTUuOTQ5MSAxMTUuNjkgMTUuNTYzOUwxMTUuNjk3IDEyLjg2OTRDMTE1LjY5NyAxMi40Nzc0IDExNi4wMzcgMTIuMjAxMyAxMTYuNDM2IDEyLjIwNjRMMTE2LjU1MiAxMi4yMDgxTDExNi41NTIgMTIuMjA4MUMxMTcuMzY0IDEyLjIyMDIgMTE4LjEzOSAxMi4yMzE4IDExOS42OTIgMTIuMjMxOEgxMzEuMTIyQzEzMS41MDYgMTIuMjMxOCAxMzEuODMyIDEyLjIzNjkgMTMyLjEyMSAxMi4yNDEzQzEzMi42NTEgMTIuMjQ5NSAxMzMuMDU0IDEyLjI1NTggMTMzLjQ1IDEyLjIyNVpNODMuNzc3NiA5LjM3MzA0SDc0LjIzNDRDNzQuMjU3OSA5LjMyNjc4IDc0LjI4NCA5LjI3NjgzIDc0LjMxMjUgOS4yMjIxM0M3NC40NjU0IDguOTI5MzQgNzQuNjg5MyA4LjUwMDM4IDc0Ljk2NzQgNy43NzI2NEM3NS4xMzI4IDcuMzM5MSA3NS4yNTg4IDYuOTg1MTUgNzUuMzUwNiA2LjcxMDc5Qzc1LjQ3NzUgNi4zMzE0NCA3NS4yMzkxIDUuOTMxNzcgNzQuODQwNSA1Ljg1MTMyTDcxLjg0MjYgNS4yNDg0MkM3MS41MTM0IDUuMTgxNTMgNzEuMTg1OSA1LjM1ODUgNzEuMDY5MyA1LjY2ODQyQzcwLjc0MDEgNi41NDgyMSA3MC4wMDg5IDguMzcyMTUgNjkuMDE5NiAxMC4xMDA0QzY3LjY2ODUgMTIuNDU4NyA2NS45ODkxIDE0LjMxNzMgNjUuMTUxNSAxNS4xNzQzQzY0Ljg3NDYgMTUuNDU3OSA2NC45MDg5IDE1LjkxMDkgNjUuMjIxOCAxNi4xNTQ4TDY3LjU1MzYgMTcuOTczN0M2Ny44MTY4IDE4LjE3ODYgNjguMTk0IDE4LjE2NTkgNjguNDM5MiAxNy45Mzk4QzY5LjI1MjggMTcuMTkyMSA3MS4wMDMzIDE1LjQ2NzIgNzIuMjI0MSAxMy40MDc5SDc3LjIzMTRDNzYuOTM0IDE3LjEwNjYgNzYuMDcxNSAxOS4yNDA0IDc0LjA1MjcgMjEuMDk4MkM3Mi43MjEzIDIyLjMyMjcgNzAuNjkyMSAyMy4zNzUyIDY5LjY0ODggMjMuODQwOUM2OS4yNTcgMjQuMDE1NCA2OS4xMzEgMjQuNTAxNCA2OS4zODczIDI0Ljg0MUw3MS4wNDI3IDI3LjA0NDNDNzEuMjMzOSAyNy4yOTgzIDcxLjU3NzcgMjcuMzg4OSA3MS44NzA5IDI3LjI1NkM3My40MTgzIDI2LjU1NzQgNzguMDk5IDI0LjE1OTMgODAuMTYwOCAxOS45MjM4QzgxLjAzMTggMTguMTMyOSA4MS4zNzMgMTYuNDc0IDgxLjYxOSAxMy40MTM4SDgzLjc0MDhDODQuMzA4NCAxMy40MTM4IDg0Ljg2NzMgMTMuNDI2OSA4NS40MDQzIDEzLjQzOTVDODUuODUxMSAxMy40NSA4Ni4yODI3IDEzLjQ2MDIgODYuNjkxNSAxMy40NjIxQzg3LjA4NDEgMTMuNDYzOCA4Ny40MTE2IDEzLjE4MDEgODcuNDExNiAxMi43OTQ4TDg3LjQwNjUgOS45OTYyNkM4Ny40MDY1IDkuNjAyNTEgODcuMDYxIDkuMzI3MzEgODYuNjYwNiA5LjMzNDA4Qzg2LjQ3NTYgOS4zMzc2IDg2LjI5ODUgOS4zNDEzMyA4Ni4xMjI1IDkuMzQ1MDRMODYuMTIyMiA5LjM0NTA1Qzg1LjQ1MDIgOS4zNTkyMSA4NC43OTQ1IDkuMzczMDQgODMuNzc3NiA5LjM3MzA0Wk00Mi43MTkyIDcuNTk3NDZDNDUuNzYyNSA3LjI4NTAxIDU0LjI3MTkgNi4xNjA1IDU3LjQ3NDcgNS4yNDc2OEw1Ny40NzM4IDUuMjQ2ODNDNTcuNzg1OSA1LjE1NzkyIDU4LjExNSA1LjI5NTk0IDU4LjI2NTEgNS41Nzk2MUw1OS41NDkzIDcuOTExNjJDNTkuNzQ2NCA4LjI4MjUgNTkuNTUwMSA4LjczNjM3IDU5LjE0MjEgOC44NTgzQzU4LjI4ODIgOS4xMTQwMyA1Ni42MDAyIDkuNTUxODEgNTMuNDg1NyAxMC4xNTQ3QzUzLjQ2NiAxMS43NTM0IDUzLjQ0NTQgMTIuNzA4NiA1My40MjU3IDEzLjM3NzVINTcuNjUzOEM1OS4wNTYzIDEzLjM3NzUgNTkuNzk2MiAxMy4zNjMxIDYwLjY2MiAxMy4zNDI4QzYxLjA1ODkgMTMuMzMyNiA2MS4zOTg0IDEzLjYxNDYgNjEuMzk4NCAxNC4wMDQxTDYxLjQwOTYgMTYuNzE4OUM2MS40MTEzIDE3LjEwNTggNjEuMDc4NyAxNy4zODcgNjAuNjg0MyAxNy4zODdDNjAuMjE5OSAxNy4zODc0IDU5Ljc4OTMgMTcuMzgxNyA1OS4zMzU2IDE3LjM3NTZDNTguODQ5NiAxNy4zNjkyIDU4LjMzNzIgMTcuMzYyNCA1Ny43Mjg0IDE3LjM2MjRINTMuMTUzMUM1Mi44NjY4IDE5LjQ2NDEgNTIuMzUwNyAyMC45MDc4IDUxLjQ5MzQgMjIuMjc5NkM1MC42MTMgMjMuNzA4OSA0OS4xMzkzIDI1LjEyMTQgNDcuMzQ3NiAyNi4yNTE4QzQ2Ljg2NzYgMjYuNTQ0OCA0NS43OSAyNy4wNzY1IDQ1LjE2MTYgMjcuMzgxNEM0NC44ODA0IDI3LjUxNjkgNDQuNTQxOCAyNy40NDQ5IDQ0LjM0MDMgMjcuMjA3OEw0Mi41Mzc0IDI1LjA2ODlDNDIuMjU0NSAyNC43MzYxIDQyLjM2NDMgMjQuMjMyMiA0Mi43NjIgMjQuMDQzNEM0My41ODc2IDIzLjY1MjIgNDQuODgzIDIyLjkwNzkgNDUuODc1NyAyMi4xMDI2QzQ3LjQ2ODUgMjAuODExMyA0OC4zNjk1IDE5LjQyNTEgNDguNzExNiAxNy4zNjI0SDQzLjcxNTNDNDMuNTc3NCAxNy4zNjI0IDQzLjQ0NTMgMTcuMzYyNCA0My4zMTg0IDE3LjM2MjNDNDIuMTkzMiAxNy4zNjIgNDEuNDcyOCAxNy4zNjE5IDQwLjY4MzEgMTcuMzg3QzQwLjI5MDUgMTcuNDAwNSAzOS45NTc5IDE3LjEwNTggMzkuOTYwNSAxNi43MTk3TDM5Ljk2OTkgMTQuMDA0MUMzOS45NzE2IDEzLjYxNDYgNDAuMzA5NCAxMy4zMzE4IDQwLjcwNTQgMTMuMzQxOUM0MS41OTM2IDEzLjM2NCA0Mi4zMTg4IDEzLjM3ODQgNDMuNzY1OSAxMy4zNzg0SDQ5LjA5OUM0OS4xMTk2IDEyLjcxMTkgNDkuMTM2OCAxMS41NTAyIDQ5LjEzNjggMTAuNzk0OVYxMC43NjM1QzQ3LjkxNzcgMTAuOTA3NSA0NS4wOTMgMTEuMTg3OCA0My41NDk5IDExLjMwMTJDNDMuMjMyNyAxMS4zMjQxIDQyLjk0MzggMTEuMTI2IDQyLjg1MjEgMTAuODI3OUw0Mi4xMjUxIDguNDU1MjRDNDIuMDAwOCA4LjA0NzEgNDIuMjg4IDcuNjQyMzQgNDIuNzE5MiA3LjU5NzQ2WiIgZmlsbD0iIzFEMUIxQSIvPgo8L3N2Zz4K";
@@ -756,6 +770,12 @@ function practiceSteps(active) { return `<ol class="tp-steps">${['申込', '確�
 function practiceFooter() { return '<div class="tp-footer">Copyright © Tixplus, Inc. All Rights Reserved.</div>'; }
 function practicePage(body, step = 0) { return `${practiceHeader()}<div class="tp-content">${practiceSteps(step)}${body}</div>${practiceFooter()}`; }
 function practiceHeading() { return '<h2 class="tp-page-title">Mrs. GREEN APPLE Ringo Jam Tour “SHADOWS”<br>＜10/6(火)公演 指定席＞ OFFICIAL FAN CLUB「Ringo Jam」機材開放当日引換券販売（先着）受付</h2>'; }
+function practiceTour() {
+  return `<div class="tp-tour"><header><span>Mrs. GREEN APPLE</span><span>Ringo Jam</span></header><div class="tp-tour-hero"><small>Mrs. GREEN APPLE Ringo Jam Tour</small><h1>SHADOWS</h1><p>OFFICIAL FAN CLUB「Ringo Jam」</p></div><section class="tp-tour-ticket"><h2>T i c k e t</h2><h3>広島公演<br>機材開放当日引換券販売（先着）</h3><dl><dt>受付期間</dt><dd>目標時刻 〜 予定枚数終了まで</dd><dt>対象公演</dt><dd>10月6日(火) 広島グリーンアリーナ 18:00-</dd><dt>対象席種</dt><dd>指定席 15,000円（税込）</dd></dl>${practiceRun.applicationVisible ? practiceButton('tour-apply', 'お申し込みはこちら') : '<p class="tp-tour-pending">受付開始前</p>'}<p id="practice-reload-note" role="status"></p><p class="tp-pay-note">目標時刻を過ぎてから、右上の「リロード」を押してください。</p></section></div>`;
+}
+function practiceConsent() {
+  return practicePage(`<h2 class="tp-page-title">お申し込みに関する注意事項</h2><section class="tp-box"><h3 class="tp-area-title">お申し込みの前に必ずご確認ください</h3><div class="tp-box-body"><p>お一人様2枚までお申し込みいただけます。</p><p>決済方法はクレジットカードのみとなります。</p><p>購入後の返金・キャンセルはできません。</p><p>購入者・同行者ともに顔写真登録と本人確認が必要です。</p><p>購入ページに進んだ時点ではチケットの確保は完了していません。</p><p class="tp-pay-note">練習用に要約した注意事項です。実際のお申し込み時は公式の全文をご確認ください。</p></div></section><div class="tp-actions">${practiceButton('consent-next', '上記の内容に同意して申し込む')}</div>`);
+}
 function practiceQueue() {
   return `${practiceHeader(true)}<div class="tq-content"><div class="tq-hero"><h1>順番にご案内しております。</h1><h2>このまましばらくお待ちください。</h2><p>本受付ではアクセス集中の緩和対策として、待合室システムを導入しております。</p></div><img class="tq-art" src="${practiceQueueArt}" alt=""><section class="tq-card"><h3>待ち状況</h3><div class="tq-info"><span>予想待ち時間：</span><strong>計算中...</strong></div><div class="tq-info tq-update"><span>最終更新日時：</span><img src="${practiceCheckIcon}" alt="チェック"><span id="practice-last-updated">${new Date().toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour12: false })}</span></div></section><ul class="tq-notes"><li>待合室にアクセス後、アクセスした順に順番が割り当てられ、順番が来ましたら自動的に購入ページへ遷移いたします。<br>※遷移まで1〜2分程度かかる場合や、ご案内時間が目安より前後する場合がございます。</li><li>購入ページへご案内された時点では、チケットの確保は完了しておりません。決済完了前に完売となる場合がございます。<br>※購入確定のご確認は購入いただいたPlusmemberIDのマイページより「所持チケット一覧」をご確認ください。</li><li>購入ページでのログイン後、15分以内に決済が完了しない場合は最初からやり直しとなりますので、お早めにお手続きください。</li><li>以下の操作を行うと、順番が並び直しになったり、アクセスが一時ブロックされたりする可能性がございますので、ご注意ください。<br>※過度なページ更新（リロード）や短時間での連続アクセス<br>※ブラウザのプライベートモードやシークレットモードでの閲覧<br>※電波状況が不安定な場所での操作</li></ul></div><div class="tq-footer">Copyright © Ticketplus, Inc. All Rights Reserved.</div>`;
 }
@@ -854,14 +874,19 @@ $('practice-stage').addEventListener('pointerdown', event => {
 function renderPractice() {
   practiceMenuClose?.();
   $('practice-current-label').textContent = practiceLabels[practiceRun.stage];
-  $('practice-stage').innerHTML = ({ queue: practiceQueue, login: practiceLogin, registration: practiceRegistration, ticket: practiceTicket, 'order-confirm': practiceOrderConfirm, payment: practicePayment, 'payment-confirm': practicePaymentConfirm })[practiceRun.stage]();
+  $('practice-stage').innerHTML = ({ tour: practiceTour, consent: practiceConsent, queue: practiceQueue, login: practiceLogin, registration: practiceRegistration, ticket: practiceTicket, 'order-confirm': practiceOrderConfirm, payment: practicePayment, 'payment-confirm': practicePaymentConfirm })[practiceRun.stage]();
   if (practiceRun.stage === 'ticket' && !practiceData.quantity) $('practice-quantity').selectedIndex = -1;
+  $('practice-launch-timer').hidden = practiceRun.stage !== 'tour';
   $('practice-fill').hidden = !((practiceRun.stage === 'login' && !practiceData.loginReady) || (practiceRun.stage === 'payment' && practiceData.payMethod === 'card' && practiceData.cardChoice === 'new'));
   $('practice-stop').textContent = practiceRun.status === 'complete' ? '設定へ戻る' : '中止';
   updatePracticeClocks();
   if (practiceFriendOpen) $('practice-stage').querySelector('input[name="practice-demo-friend"]')?.focus();
 }
 function updatePracticeClocks() {
+  if (practiceRun.stage === 'tour') {
+    const remaining = practiceRun.launchSeconds * 1000 - practiceRun.elapsed();
+    $('practice-countdown').textContent = remaining > 0 ? `開始まで ${(remaining / 1000).toFixed(3)}秒` : `開始から ${(-remaining / 1000).toFixed(3)}秒`;
+  }
   $('practice-total-clock').textContent = practiceSeconds(practiceRun.elapsed()); $('practice-step-clock').textContent = practiceSeconds(practiceRun.stageElapsed());
 
 }
@@ -872,8 +897,8 @@ function closePractice() {
 }
 function practiceResult() {
   const result = practiceRun.result(); closePractice(); $('practice-result').hidden = false;
-  $('practice-result-note').textContent = 'クレカ支払い画面の「支払い内容の確認へ」を押すまでの所要時間です。操作時間からは待合室の時間を除いています。';
-  $('practice-metrics').innerHTML = [['全体の時間', practiceSeconds(result.totalMs)], ['操作時間（待合室を除く）', practiceSeconds(result.operationMs)], ['ボタン操作', `${result.clicks}回`]].map(([label, value]) => `<div class="practice-metric"><span>${label}</span><strong>${value}</strong></div>`).join('');
+  $('practice-result-note').textContent = 'クレカ支払い画面の「支払い内容の確認へ」を押すまでの所要時間です。操作時間からは目標時刻までの待ち時間と待合室の時間を除いています。';
+  $('practice-metrics').innerHTML = [['全体の時間', practiceSeconds(result.totalMs)], ['操作時間（待ち時間を除く）', practiceSeconds(result.operationMs)], ['ボタン操作', `${result.clicks}回`]].map(([label, value]) => `<div class="practice-metric"><span>${label}</span><strong>${value}</strong></div>`).join('');
   $('practice-laps').innerHTML = result.laps.map(lap => `<tr><th scope="row">${practiceLabels[lap.stage]}</th><td>${practiceSeconds(lap.milliseconds)}</td></tr>`).join('');
   updatePracticeClocks();
 }
@@ -881,11 +906,12 @@ function startPractice() {
   if (typeof job !== 'undefined' && job) { $('practice-start-note').textContent = '受付の取得・予約を解除してからイメトレを開始してください。'; return; }
   const waitSeconds = Number($('practice-wait').value);
   if ($('practice-wait').value === '') { $('practice-start-note').textContent = '待合室の練習時間を入力してください。'; return; }
-  try { practiceRun.start({ waitSeconds, skipLogin: $('practice-skip-login').checked }); }
+  try { practiceRun.start({ waitSeconds, skipLogin: $('practice-skip-login').checked, fromTour: $('practice-from-tour').checked, launchSeconds: Number($('practice-launch-seconds').value || '10') }); }
   catch (error) { $('practice-start-note').textContent = error.message; return; }
   clearInterval(practiceTimer); practiceFriendOpen = false; practiceFriendChoice = '';
   practiceData = { performance: '', seat: '', quantity: '', friend: '', phone: practiceDemo.phone, fellowId: '', fellowPhone: '', fellowReceive: '', collapsed: false, loginReady: $('practice-prefill').checked, payMethod: '', savedCard: true, cardChoice: 'saved', cardNumber: '', cardName: '', cardSecurity: '', cardMonth: '01', cardYear: '2026', deleteCardOpen: false };
   document.body.classList.add('practice-active'); $('practice-session').hidden = false; $('practice-result').hidden = true; $('practice-start').disabled = true; $('practice-start-note').textContent = '';
+  $('practice-target-time').textContent = new Date(Date.now() + practiceRun.launchSeconds * 1000).toLocaleTimeString('ja-JP', {timeZone:'Asia/Tokyo', hour12:false});
   renderPractice(); $('practice-session').scrollTop = 0;
   practiceTimer = setInterval(() => { if (practiceRun.tick()) { renderPractice(); $('practice-session').scrollTop = 0; } updatePracticeClocks(); }, 50);
 }
@@ -901,7 +927,9 @@ $('practice-stage').addEventListener('click', event => {
   if (practiceRun.status === 'complete') { if (button.dataset.practiceAction === 'finish-practice') practiceResult(); else if (button.dataset.practiceAction === 'confirm-back' && practiceRun.resumePayment()) { renderPractice(); $('practice-session').scrollTop = 0; practiceTimer = setInterval(updatePracticeClocks, 50); } return; }
   if (practiceRun.status !== 'running') return;
   practiceRun.tap(); const action = button.dataset.practiceAction;
-  if (action === 'login-next') { if (!$('practice-demo-id').value || !$('practice-demo-password').value) return practiceError('ID・パスワードを入力してください（練習用）。'); advancePractice('login'); }
+  if (action === 'tour-apply') advancePractice('tour');
+  else if (action === 'consent-next') advancePractice('consent');
+  else if (action === 'login-next') { if (!$('practice-demo-id').value || !$('practice-demo-password').value) return practiceError('ID・パスワードを入力してください（練習用）。'); advancePractice('login'); }
   else if (action === 'registration-next') advancePractice('registration');
   else if (action === 'ticket-toggle') { practiceData.collapsed = !practiceData.collapsed; renderPractice(); }
   else if (action === 'friend-open') { practiceFriendOpen = true; practiceFriendChoice = practiceData.friend; renderPractice(); }
@@ -951,6 +979,11 @@ $('practice-stage').addEventListener('keydown', event => {
   else if (!event.shiftKey && document.activeElement === controls.at(-1)) { event.preventDefault(); controls[0]?.focus(); }
 });
 $('practice-stage').addEventListener('submit', event => { event.preventDefault(); if (practiceRun.stage === 'login') $('practice-stage').querySelector('[data-practice-action="login-next"]')?.click(); });
+$('practice-reload').addEventListener('click', () => {
+  if (practiceRun.status !== 'running' || practiceRun.stage !== 'tour') return;
+  practiceRun.tap(); const opened = practiceRun.reloadTour(); renderPractice();
+  if (!opened) $('practice-reload-note').textContent = 'まだ受付開始前です。目標時刻を過ぎてから再度リロードしてください。';
+});
 $('practice-start').addEventListener('click', startPractice);
 $('practice-again').addEventListener('click', startPractice);
 $('practice-fill').addEventListener('click', () => { if (practiceRun.stage === 'login') practiceData.loginReady = true; else if (practiceRun.stage === 'payment') { practiceData.cardNumber = '4242424242424242'; practiceData.cardName = 'DEMO TARO'; practiceData.cardSecurity = '123'; practiceData.cardMonth = '12'; practiceData.cardYear = '2031'; } renderPractice(); });

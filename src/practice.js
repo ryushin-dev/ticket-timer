@@ -1,6 +1,6 @@
 const practiceRun = new TicketPracticeRun();
 let practiceTimer = null, practiceData = null, practiceFriendOpen = false, practiceFriendChoice = '';
-const practiceLabels = { queue: '仮想待合室', login: 'ログイン', registration: '登録情報の確認', ticket: '公演申込', 'order-confirm': '申込内容の確認', payment: 'クレカ支払い', 'payment-confirm': '支払い内容の確認' };
+const practiceLabels = { tour: 'SHADOWS受付ページ', consent: '注意事項への同意', queue: '仮想待合室', login: 'ログイン', registration: '登録情報の確認', ticket: '公演申込', 'order-confirm': '申込内容の確認', payment: 'クレカ支払い', 'payment-confirm': '支払い内容の確認' };
 const practiceDemo = Object.freeze({ id: 'E000000000000', password: 'practice-only', phone: '09000000000', email: 'demo@example.invalid', name: 'デモ タロウ', kana: 'デモ タロウ' });
 const practiceFriends = Object.freeze([{ key: 'demo-a', name: 'デモ ハナコ', id: 'E000000000001', phone: '***-****-0001' }, { key: 'demo-b', name: 'デモ ジロウ', id: 'E000000000002', phone: '***-****-0002' }]);
 const practiceLogo = /* PRACTICE_LOGO */;
@@ -22,6 +22,12 @@ function practiceSteps(active) { return `<ol class="tp-steps">${['申込', '確�
 function practiceFooter() { return '<div class="tp-footer">Copyright © Tixplus, Inc. All Rights Reserved.</div>'; }
 function practicePage(body, step = 0) { return `${practiceHeader()}<div class="tp-content">${practiceSteps(step)}${body}</div>${practiceFooter()}`; }
 function practiceHeading() { return '<h2 class="tp-page-title">Mrs. GREEN APPLE Ringo Jam Tour “SHADOWS”<br>＜10/6(火)公演 指定席＞ OFFICIAL FAN CLUB「Ringo Jam」機材開放当日引換券販売（先着）受付</h2>'; }
+function practiceTour() {
+  return `<div class="tp-tour"><header><span>Mrs. GREEN APPLE</span><span>Ringo Jam</span></header><div class="tp-tour-hero"><small>Mrs. GREEN APPLE Ringo Jam Tour</small><h1>SHADOWS</h1><p>OFFICIAL FAN CLUB「Ringo Jam」</p></div><section class="tp-tour-ticket"><h2>T i c k e t</h2><h3>広島公演<br>機材開放当日引換券販売（先着）</h3><dl><dt>受付期間</dt><dd>目標時刻 〜 予定枚数終了まで</dd><dt>対象公演</dt><dd>10月6日(火) 広島グリーンアリーナ 18:00-</dd><dt>対象席種</dt><dd>指定席 15,000円（税込）</dd></dl>${practiceRun.applicationVisible ? practiceButton('tour-apply', 'お申し込みはこちら') : '<p class="tp-tour-pending">受付開始前</p>'}<p id="practice-reload-note" role="status"></p><p class="tp-pay-note">目標時刻を過ぎてから、右上の「リロード」を押してください。</p></section></div>`;
+}
+function practiceConsent() {
+  return practicePage(`<h2 class="tp-page-title">お申し込みに関する注意事項</h2><section class="tp-box"><h3 class="tp-area-title">お申し込みの前に必ずご確認ください</h3><div class="tp-box-body"><p>お一人様2枚までお申し込みいただけます。</p><p>決済方法はクレジットカードのみとなります。</p><p>購入後の返金・キャンセルはできません。</p><p>購入者・同行者ともに顔写真登録と本人確認が必要です。</p><p>購入ページに進んだ時点ではチケットの確保は完了していません。</p><p class="tp-pay-note">練習用に要約した注意事項です。実際のお申し込み時は公式の全文をご確認ください。</p></div></section><div class="tp-actions">${practiceButton('consent-next', '上記の内容に同意して申し込む')}</div>`);
+}
 function practiceQueue() {
   return `${practiceHeader(true)}<div class="tq-content"><div class="tq-hero"><h1>順番にご案内しております。</h1><h2>このまましばらくお待ちください。</h2><p>本受付ではアクセス集中の緩和対策として、待合室システムを導入しております。</p></div><img class="tq-art" src="${practiceQueueArt}" alt=""><section class="tq-card"><h3>待ち状況</h3><div class="tq-info"><span>予想待ち時間：</span><strong>計算中...</strong></div><div class="tq-info tq-update"><span>最終更新日時：</span><img src="${practiceCheckIcon}" alt="チェック"><span id="practice-last-updated">${new Date().toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour12: false })}</span></div></section><ul class="tq-notes"><li>待合室にアクセス後、アクセスした順に順番が割り当てられ、順番が来ましたら自動的に購入ページへ遷移いたします。<br>※遷移まで1〜2分程度かかる場合や、ご案内時間が目安より前後する場合がございます。</li><li>購入ページへご案内された時点では、チケットの確保は完了しておりません。決済完了前に完売となる場合がございます。<br>※購入確定のご確認は購入いただいたPlusmemberIDのマイページより「所持チケット一覧」をご確認ください。</li><li>購入ページでのログイン後、15分以内に決済が完了しない場合は最初からやり直しとなりますので、お早めにお手続きください。</li><li>以下の操作を行うと、順番が並び直しになったり、アクセスが一時ブロックされたりする可能性がございますので、ご注意ください。<br>※過度なページ更新（リロード）や短時間での連続アクセス<br>※ブラウザのプライベートモードやシークレットモードでの閲覧<br>※電波状況が不安定な場所での操作</li></ul></div><div class="tq-footer">Copyright © Ticketplus, Inc. All Rights Reserved.</div>`;
 }
@@ -120,14 +126,19 @@ $('practice-stage').addEventListener('pointerdown', event => {
 function renderPractice() {
   practiceMenuClose?.();
   $('practice-current-label').textContent = practiceLabels[practiceRun.stage];
-  $('practice-stage').innerHTML = ({ queue: practiceQueue, login: practiceLogin, registration: practiceRegistration, ticket: practiceTicket, 'order-confirm': practiceOrderConfirm, payment: practicePayment, 'payment-confirm': practicePaymentConfirm })[practiceRun.stage]();
+  $('practice-stage').innerHTML = ({ tour: practiceTour, consent: practiceConsent, queue: practiceQueue, login: practiceLogin, registration: practiceRegistration, ticket: practiceTicket, 'order-confirm': practiceOrderConfirm, payment: practicePayment, 'payment-confirm': practicePaymentConfirm })[practiceRun.stage]();
   if (practiceRun.stage === 'ticket' && !practiceData.quantity) $('practice-quantity').selectedIndex = -1;
+  $('practice-launch-timer').hidden = practiceRun.stage !== 'tour';
   $('practice-fill').hidden = !((practiceRun.stage === 'login' && !practiceData.loginReady) || (practiceRun.stage === 'payment' && practiceData.payMethod === 'card' && practiceData.cardChoice === 'new'));
   $('practice-stop').textContent = practiceRun.status === 'complete' ? '設定へ戻る' : '中止';
   updatePracticeClocks();
   if (practiceFriendOpen) $('practice-stage').querySelector('input[name="practice-demo-friend"]')?.focus();
 }
 function updatePracticeClocks() {
+  if (practiceRun.stage === 'tour') {
+    const remaining = practiceRun.launchSeconds * 1000 - practiceRun.elapsed();
+    $('practice-countdown').textContent = remaining > 0 ? `開始まで ${(remaining / 1000).toFixed(3)}秒` : `開始から ${(-remaining / 1000).toFixed(3)}秒`;
+  }
   $('practice-total-clock').textContent = practiceSeconds(practiceRun.elapsed()); $('practice-step-clock').textContent = practiceSeconds(practiceRun.stageElapsed());
 
 }
@@ -138,8 +149,8 @@ function closePractice() {
 }
 function practiceResult() {
   const result = practiceRun.result(); closePractice(); $('practice-result').hidden = false;
-  $('practice-result-note').textContent = 'クレカ支払い画面の「支払い内容の確認へ」を押すまでの所要時間です。操作時間からは待合室の時間を除いています。';
-  $('practice-metrics').innerHTML = [['全体の時間', practiceSeconds(result.totalMs)], ['操作時間（待合室を除く）', practiceSeconds(result.operationMs)], ['ボタン操作', `${result.clicks}回`]].map(([label, value]) => `<div class="practice-metric"><span>${label}</span><strong>${value}</strong></div>`).join('');
+  $('practice-result-note').textContent = 'クレカ支払い画面の「支払い内容の確認へ」を押すまでの所要時間です。操作時間からは目標時刻までの待ち時間と待合室の時間を除いています。';
+  $('practice-metrics').innerHTML = [['全体の時間', practiceSeconds(result.totalMs)], ['操作時間（待ち時間を除く）', practiceSeconds(result.operationMs)], ['ボタン操作', `${result.clicks}回`]].map(([label, value]) => `<div class="practice-metric"><span>${label}</span><strong>${value}</strong></div>`).join('');
   $('practice-laps').innerHTML = result.laps.map(lap => `<tr><th scope="row">${practiceLabels[lap.stage]}</th><td>${practiceSeconds(lap.milliseconds)}</td></tr>`).join('');
   updatePracticeClocks();
 }
@@ -147,11 +158,12 @@ function startPractice() {
   if (typeof job !== 'undefined' && job) { $('practice-start-note').textContent = '受付の取得・予約を解除してからイメトレを開始してください。'; return; }
   const waitSeconds = Number($('practice-wait').value);
   if ($('practice-wait').value === '') { $('practice-start-note').textContent = '待合室の練習時間を入力してください。'; return; }
-  try { practiceRun.start({ waitSeconds, skipLogin: $('practice-skip-login').checked }); }
+  try { practiceRun.start({ waitSeconds, skipLogin: $('practice-skip-login').checked, fromTour: $('practice-from-tour').checked, launchSeconds: Number($('practice-launch-seconds').value || '10') }); }
   catch (error) { $('practice-start-note').textContent = error.message; return; }
   clearInterval(practiceTimer); practiceFriendOpen = false; practiceFriendChoice = '';
   practiceData = { performance: '', seat: '', quantity: '', friend: '', phone: practiceDemo.phone, fellowId: '', fellowPhone: '', fellowReceive: '', collapsed: false, loginReady: $('practice-prefill').checked, payMethod: '', savedCard: true, cardChoice: 'saved', cardNumber: '', cardName: '', cardSecurity: '', cardMonth: '01', cardYear: '2026', deleteCardOpen: false };
   document.body.classList.add('practice-active'); $('practice-session').hidden = false; $('practice-result').hidden = true; $('practice-start').disabled = true; $('practice-start-note').textContent = '';
+  $('practice-target-time').textContent = new Date(Date.now() + practiceRun.launchSeconds * 1000).toLocaleTimeString('ja-JP', {timeZone:'Asia/Tokyo', hour12:false});
   renderPractice(); $('practice-session').scrollTop = 0;
   practiceTimer = setInterval(() => { if (practiceRun.tick()) { renderPractice(); $('practice-session').scrollTop = 0; } updatePracticeClocks(); }, 50);
 }
@@ -167,7 +179,9 @@ $('practice-stage').addEventListener('click', event => {
   if (practiceRun.status === 'complete') { if (button.dataset.practiceAction === 'finish-practice') practiceResult(); else if (button.dataset.practiceAction === 'confirm-back' && practiceRun.resumePayment()) { renderPractice(); $('practice-session').scrollTop = 0; practiceTimer = setInterval(updatePracticeClocks, 50); } return; }
   if (practiceRun.status !== 'running') return;
   practiceRun.tap(); const action = button.dataset.practiceAction;
-  if (action === 'login-next') { if (!$('practice-demo-id').value || !$('practice-demo-password').value) return practiceError('ID・パスワードを入力してください（練習用）。'); advancePractice('login'); }
+  if (action === 'tour-apply') advancePractice('tour');
+  else if (action === 'consent-next') advancePractice('consent');
+  else if (action === 'login-next') { if (!$('practice-demo-id').value || !$('practice-demo-password').value) return practiceError('ID・パスワードを入力してください（練習用）。'); advancePractice('login'); }
   else if (action === 'registration-next') advancePractice('registration');
   else if (action === 'ticket-toggle') { practiceData.collapsed = !practiceData.collapsed; renderPractice(); }
   else if (action === 'friend-open') { practiceFriendOpen = true; practiceFriendChoice = practiceData.friend; renderPractice(); }
@@ -217,6 +231,11 @@ $('practice-stage').addEventListener('keydown', event => {
   else if (!event.shiftKey && document.activeElement === controls.at(-1)) { event.preventDefault(); controls[0]?.focus(); }
 });
 $('practice-stage').addEventListener('submit', event => { event.preventDefault(); if (practiceRun.stage === 'login') $('practice-stage').querySelector('[data-practice-action="login-next"]')?.click(); });
+$('practice-reload').addEventListener('click', () => {
+  if (practiceRun.status !== 'running' || practiceRun.stage !== 'tour') return;
+  practiceRun.tap(); const opened = practiceRun.reloadTour(); renderPractice();
+  if (!opened) $('practice-reload-note').textContent = 'まだ受付開始前です。目標時刻を過ぎてから再度リロードしてください。';
+});
 $('practice-start').addEventListener('click', startPractice);
 $('practice-again').addEventListener('click', startPractice);
 $('practice-fill').addEventListener('click', () => { if (practiceRun.stage === 'login') practiceData.loginReady = true; else if (practiceRun.stage === 'payment') { practiceData.cardNumber = '4242424242424242'; practiceData.cardName = 'DEMO TARO'; practiceData.cardSecurity = '123'; practiceData.cardMonth = '12'; practiceData.cardYear = '2031'; } renderPractice(); });

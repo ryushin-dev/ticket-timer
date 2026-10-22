@@ -68,3 +68,19 @@ test('公演・席種メニューの2行目が選択枠の中央に重なる',as
    assert.equal(top+5+28+14,200+height/2);
  }
 });
+
+test('受付ページは時刻後のリロードでのみ開き、待合室と同意を経て進む',async()=>{
+ const h=await uiHarness();h.get('practice-from-tour').checked=true;h.get('practice-launch-seconds').value='2';h.get('practice-skip-login').checked=true;h.start();
+ assert.equal(h.stage(),'tour');assert.doesNotMatch(h.get('practice-stage').innerHTML,/data-practice-action="tour-apply"/);
+ h.action('tour-apply');assert.equal(h.stage(),'tour');
+ h.advance(1999);h.get('practice-reload').listeners.click[0]();assert.doesNotMatch(h.get('practice-stage').innerHTML,/data-practice-action="tour-apply"/);
+ h.advance(1);vm.runInContext('updatePracticeClocks()',h.context);assert.match(h.get('practice-countdown').textContent,/開始から/);assert.doesNotMatch(h.get('practice-stage').innerHTML,/data-practice-action="tour-apply"/);
+ h.advance(100);h.get('practice-reload').listeners.click[0]();assert.match(h.get('practice-stage').innerHTML,/data-practice-action="tour-apply"/);
+ h.action('tour-apply');assert.equal(h.stage(),'queue');vm.runInContext('practiceRun.tick() && renderPractice()',h.context);assert.equal(h.stage(),'consent');h.action('ticket-next');assert.equal(h.stage(),'consent');h.action('consent-next');assert.equal(h.stage(),'registration');h.action('registration-next');assert.equal(h.stage(),'ticket');
+ assert.equal(vm.runInContext('practiceRun.result().operationMs',h.context),100);assert.equal(h.calls(),0);
+ h.get('practice-stop').listeners.click[0]();h.start();assert.equal(h.stage(),'tour');assert.doesNotMatch(h.get('practice-stage').innerHTML,/data-practice-action="tour-apply"/);
+});
+test('受付ページモードでも未ログインの場合は同意後にログインする',()=>{
+ const h=runModel();h.run.start({fromTour:true,launchSeconds:1,waitSeconds:1});h.advance(1000);assert.equal(h.run.reloadTour(),true);h.run.advance('tour');h.advance(999);assert.equal(h.run.tick(),false);h.advance(1);assert.equal(h.run.tick(),true);assert.equal(h.run.stage,'consent');h.run.advance('consent');assert.equal(h.run.stage,'login');
+ for(const launchSeconds of [-1,301,NaN])assert.throws(()=>h.run.start({fromTour:true,launchSeconds}),/0〜300秒/);
+});
