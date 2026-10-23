@@ -12,7 +12,7 @@ function log(message) {
   box.textContent += `${jst(Date.now()).slice(11, 23)}  ${message}\n`;
   box.scrollTop = box.scrollHeight;
 }
-function state(title, detail, badge) { $('run-heading').textContent = title; $('detail').textContent = detail; $('badge').textContent = badge; }
+function state(title, detail, badge) { $('run-heading').textContent = title; $('detail').textContent = detail; $('badge').textContent = badge; $('mini-badge').textContent = badge; }
 function saveSettings(cfg) {
   try { localStorage.setItem(storageKey, JSON.stringify(cfg)); }
   catch { $('save-note').textContent = 'このブラウザでは保存できません。設定は今回の実行だけに使います。'; }
@@ -390,8 +390,8 @@ window.addEventListener('resize', () => syncTimeWheels(true));
 window.addEventListener('beforeunload', event => { if (job && $('badge').textContent !== 'OPENING') { event.preventDefault(); event.returnValue = ''; } });
 setInterval(() => {
   $('clock').textContent = jst(Date.now()).slice(11, 23);
-  if (countdownTarget === null) { $('countdown').textContent = '--:--:--.---'; return; }
+  if (countdownTarget === null) { $('countdown').textContent = $('mini-countdown').textContent = '--:--:--.---'; return; }
   const ms = Math.max(0, countdownTarget - Date.now());
   const hours = Math.floor(ms / 3600000), minutes = Math.floor(ms / 60000) % 60, seconds = Math.floor(ms / 1000) % 60;
-  $('countdown').textContent = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(ms % 1000).padStart(3, '0')}`;
+  $('countdown').textContent = $('mini-countdown').textContent = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(ms % 1000).padStart(3, '0')}`;
 }, 100);

@@ -32,15 +32,22 @@ body.practice-active{overflow:hidden}body.practice-active main>header,body.pract
 #practice-launch-timer{border-top:1px solid #ddd;margin-top:6px;padding-top:6px}#practice-launch-timer small{font-size:10px}#practice-countdown{display:block;font:12px/1.8 ui-monospace,monospace;color:#b34835}
 .tp-reference-frame{display:block;border:0;width:100%;height:100vh;background:#fff}
 
-/* Keep the practice controls outside the touchable reference page on small screens. */
-@media(max-width:600px){
- body.practice-active:has(.tp-reference-frame) .tp-reference-frame{height:calc(100dvh - 148px);min-height:200px}
- body.practice-active:has(.tp-reference-frame) .practice-toolbar{top:auto;bottom:0;left:0;right:0;width:100%;height:148px;padding:8px 12px max(8px,env(safe-area-inset-bottom));border-radius:0;display:grid;grid-template-columns:1fr 1.4fr .8fr;grid-template-rows:18px 1fr;gap:4px 10px;background:#fff;box-sizing:border-box}
- body.practice-active:has(.tp-reference-frame) .practice-toolbar .simulation-tag{display:none}
- body.practice-active:has(.tp-reference-frame) #practice-current-label{grid-column:1/-1;font-size:12px}
- body.practice-active:has(.tp-reference-frame) .practice-clocks{grid-column:1;flex-direction:column;gap:4px;margin:0;align-self:center}
- body.practice-active:has(.tp-reference-frame) #practice-launch-timer{grid-column:2;border:0;margin:0;padding:0;align-self:center;min-width:0}
- body.practice-active:has(.tp-reference-frame) #practice-countdown{font-size:11px}
- body.practice-active:has(.tp-reference-frame) #practice-stop{grid-column:3;grid-row:2;align-self:end;margin-bottom:4px}
- body.practice-active:has(.tp-reference-frame) .practice-toolbar button{min-height:44px;font-size:12px;padding:6px;margin-top:4px}
-}
+/* 参照ページ（SHADOWSトップ・公演受付）では、ブラウザの再読込ボタンの位置を再現して右上に小さなフローティング操作を出す。 */
+#practice-session:has(.tp-reference-frame) .practice-toolbar{top:max(12px,env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right));width:auto;max-width:calc(100vw - 24px);display:grid;grid-template-areas:"count reload stop" "clock reload stop";grid-template-columns:auto auto auto;align-items:center;column-gap:8px;padding:6px 6px 6px 14px;border:1px solid #ffffff40;border-radius:999px;background:#fffffff2;box-shadow:0 6px 24px #0006;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+#practice-session:has(.tp-reference-frame) .practice-toolbar .simulation-tag,#practice-session:has(.tp-reference-frame) .practice-clocks>div:last-child,#practice-session:has(.tp-reference-frame) #practice-launch-timer small{display:none}
+#practice-session:has(.tp-reference-frame) #practice-current-label{grid-area:count;font-size:11px;line-height:1.3;white-space:nowrap}
+#practice-session:has(.tp-reference-frame) .practice-clocks{grid-area:clock;margin:0}
+#practice-session:has(.tp-reference-frame) .practice-clocks small{display:inline;margin-right:4px}
+#practice-session:has(.tp-reference-frame) .practice-clocks output{font-size:11px;line-height:1.3}
+#practice-session:has(.tp-reference-frame) #practice-launch-timer{display:contents}
+#practice-session:has(.tp-reference-frame) #practice-countdown{grid-area:count;font-size:12px;line-height:1.3;white-space:nowrap;min-width:8.6em}
+#practice-session:has(.tp-reference-frame) .practice-toolbar button{width:auto;margin:0;min-height:44px;padding:0 14px;border-radius:999px;font-size:13px;white-space:nowrap}
+#practice-session:has(.tp-reference-frame) #practice-reload{grid-area:reload;background:#1a1a1a;border-color:#1a1a1a;color:#fff;font-weight:700}
+#practice-session:has(.tp-reference-frame) #practice-reload:active{transform:scale(.96)}
+#practice-session:has(.tp-reference-frame) #practice-stop{grid-area:stop;padding:0 12px}
+#practice-session:has(#practice-launch-timer:not([hidden])) #practice-current-label{display:none}
+/* SHADOWSトップのメニューボタン（1080px以下・右上60px）と重ならないよう左に寄せる */
+@media(max-width:1080px){#practice-session:has(#practice-launch-timer:not([hidden])) .practice-toolbar{right:84px;max-width:calc(100vw - 96px)}}
+/* 公演受付ページは上部に固定タブがあるため、その下に置く */
+#practice-session:has(.tp-reference-frame):has(#practice-launch-timer[hidden]) .practice-toolbar{top:96px}
+@media(max-width:600px){body.practice-active:has(.tp-reference-frame) .tp-reference-frame{height:100dvh}#practice-session:has(.tp-reference-frame) .practice-toolbar{padding-left:12px;column-gap:6px}#practice-session:has(.tp-reference-frame) .practice-toolbar button{padding:0 11px}#practice-session:has(.tp-reference-frame) #practice-countdown{min-width:0}}
