@@ -31,3 +31,16 @@ body.practice-active{overflow:hidden}body.practice-active main>header,body.pract
 
 #practice-launch-timer{border-top:1px solid #ddd;margin-top:6px;padding-top:6px}#practice-launch-timer small{font-size:10px}#practice-countdown{display:block;font:12px/1.8 ui-monospace,monospace;color:#b34835}
 .tp-reference-frame{display:block;border:0;width:100%;height:100vh;background:#fff}
+
+/* Keep the practice controls outside the touchable reference page on small screens. */
+@media(max-width:600px){
+ body.practice-active:has(.tp-reference-frame) .tp-reference-frame{height:calc(100dvh - 148px);min-height:200px}
+ body.practice-active:has(.tp-reference-frame) .practice-toolbar{top:auto;bottom:0;left:0;right:0;width:100%;height:148px;padding:8px 12px max(8px,env(safe-area-inset-bottom));border-radius:0;display:grid;grid-template-columns:1fr 1.4fr .8fr;grid-template-rows:18px 1fr;gap:4px 10px;background:#fff;box-sizing:border-box}
+ body.practice-active:has(.tp-reference-frame) .practice-toolbar .simulation-tag{display:none}
+ body.practice-active:has(.tp-reference-frame) #practice-current-label{grid-column:1/-1;font-size:12px}
+ body.practice-active:has(.tp-reference-frame) .practice-clocks{grid-column:1;flex-direction:column;gap:4px;margin:0;align-self:center}
+ body.practice-active:has(.tp-reference-frame) #practice-launch-timer{grid-column:2;border:0;margin:0;padding:0;align-self:center;min-width:0}
+ body.practice-active:has(.tp-reference-frame) #practice-countdown{font-size:11px}
+ body.practice-active:has(.tp-reference-frame) #practice-stop{grid-column:3;grid-row:2;align-self:end;margin-bottom:4px}
+ body.practice-active:has(.tp-reference-frame) .practice-toolbar button{min-height:44px;font-size:12px;padding:6px;margin-top:4px}
+}

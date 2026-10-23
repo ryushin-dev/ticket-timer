@@ -69,18 +69,18 @@ test('公演・席種メニューの2行目が選択枠の中央に重なる',as
  }
 });
 
-test('ツアーから受付ページ・待合室へ進み、待合室後は従来どおり進む',async()=>{
+test('ツアーモードは有効なリロードから計測し、待合室で停止する',async()=>{
  const h=await uiHarness();h.get('practice-from-tour').checked=true;h.get('practice-launch-seconds').value='2';h.get('practice-skip-login').checked=true;h.start();
  assert.equal(h.stage(),'tour');h.action('tour-apply');assert.equal(h.stage(),'tour');
  h.advance(1999);h.get('practice-reload').listeners.click[0]();assert.equal(vm.runInContext('practiceRun.applicationVisible',h.context),false);
  h.advance(1);vm.runInContext('updatePracticeClocks()',h.context);assert.equal(vm.runInContext('practiceRun.applicationVisible',h.context),false);
  h.advance(100);h.get('practice-reload').listeners.click[0]();assert.equal(vm.runInContext('practiceRun.applicationVisible',h.context),true);
- h.action('tour-apply');assert.equal(h.stage(),'reception');vm.runInContext("advancePractice('reception')",h.context);assert.equal(h.stage(),'queue');vm.runInContext('practiceRun.tick() && renderPractice()',h.context);assert.equal(h.stage(),'registration');
- assert.equal(vm.runInContext('practiceRun.result().operationMs',h.context),100);assert.equal(h.calls(),0);
+ h.advance(400);h.action('tour-apply');assert.equal(h.stage(),'reception');h.advance(600);vm.runInContext("advancePractice('reception')",h.context);assert.equal(h.stage(),'queue');assert.equal(h.status(),'complete');h.advance(5000);vm.runInContext('practiceRun.tick() && renderPractice()',h.context);assert.equal(h.stage(),'queue');
+ assert.equal(vm.runInContext('practiceRun.result().operationMs',h.context),1000);assert.equal(h.calls(),0);
  h.get('practice-stop').listeners.click[0]();h.start();assert.equal(h.stage(),'tour');assert.equal(vm.runInContext('practiceRun.applicationVisible',h.context),false);
 });
-test('未ログインの場合は待合室の直後にログインする',()=>{
- const h=runModel();h.run.start({fromTour:true,launchSeconds:1,waitSeconds:1});h.advance(1000);assert.equal(h.run.reloadTour(),true);h.run.advance('tour');assert.equal(h.run.stage,'reception');h.run.advance('reception');h.advance(999);assert.equal(h.run.tick(),false);h.advance(1);assert.equal(h.run.tick(),true);assert.equal(h.run.stage,'login');
+test('再リロードで計測をリセットせず、待合室到着後の時間を含めない',()=>{
+ const h=runModel();h.run.start({fromTour:true,launchSeconds:1,waitSeconds:1});h.advance(999);assert.equal(h.run.reloadTour(),false);assert.equal(h.run.elapsed(),0);h.advance(1);assert.equal(h.run.reloadTour(),true);h.advance(200);assert.equal(h.run.reloadTour(),true);assert.equal(h.run.elapsed(),200);h.run.advance('tour');h.advance(300);h.run.advance('reception');assert.equal(h.run.stage,'queue');assert.equal(h.run.status,'complete');h.advance(10000);assert.equal(h.run.elapsed(),500);assert.equal(h.run.tick(),false);
  for(const launchSeconds of [-1,301,NaN])assert.throws(()=>h.run.start({fromTour:true,launchSeconds}),/0〜300秒/);
 });
 test('再現ページは元のCSS・画像を内蔵し、外部通信・本物の購入へ遷移しない',()=>{
@@ -91,4 +91,23 @@ test('再現ページは元のCSS・画像を内蔵し、外部通信・本物�
   assert.match(html,/data:image/);
  }
  assert.match(pages.tour,/opacity: 0.5/);assert.match(pages.reception,/確認しました/);assert.match(pages.reception,/practice-reception-apply/);
+});
+
+test('SHADOWSの申込ボタンは複数ともタップでき、開始前は進まずリロード後に進む',()=>{
+ const pages=JSON.parse(readFileSync(new URL('../src/assets/shadows-reference/pages.json',import.meta.url),'utf8'));
+ const script=[...pages.tour.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
+ const listeners={},messages=[],attrs=new Map();
+ const buttons=[0,1].map(id=>({id,textContent:'お申し込みはこちら',style:{},setAttribute(k,v){attrs.set(`${id}:${k}`,v);}}));
+ const sections=buttons.map(button=>({querySelector(){return{textContent:'北海道公演 先着'};},querySelectorAll(){return[button];}}));
+ const parent={postMessage(message){messages.push(message);}};
+ const document={querySelectorAll(selector){return selector==='.ticket-schedule > li'?sections:[];},querySelector(){return null;},addEventListener(name,cb){listeners[name]=cb;}};
+ vm.runInNewContext(script,{document,parent,window:{addEventListener(name,cb){listeners[name]=cb;}}});
+ for(const button of buttons){listeners.click({target:{closest(selector){return selector==='a'?button:null;}},preventDefault(){}});}
+ assert.equal(messages.filter(x=>x.type==='practice-tour-apply').length,0);
+ listeners.message({source:parent,data:{type:'practice-unlock',enabled:true}});
+ for(const button of buttons){listeners.click({target:{closest(selector){return selector==='a'?button:null;}},preventDefault(){}});assert.equal(button.style.opacity,'1');}
+ assert.equal(messages.filter(x=>x.type==='practice-tour-apply').length,2);
+ assert.match(pages.tour,/name="viewport" content="width=device-width,initial-scale=1"/);
+ assert.match(pages.tour,/id="practice-mobile-reference"/);
+ assert.match(pages.reception,/id="practice-reception-mobile"/);
 });

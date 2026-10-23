@@ -137,13 +137,13 @@ function renderPractice() {
   if (practiceRun.stage === 'ticket' && !practiceData.quantity) $('practice-quantity').selectedIndex = -1;
   $('practice-launch-timer').hidden = practiceRun.stage !== 'tour';
   $('practice-fill').hidden = !((practiceRun.stage === 'login' && !practiceData.loginReady) || (practiceRun.stage === 'payment' && practiceData.payMethod === 'card' && practiceData.cardChoice === 'new'));
-  $('practice-stop').textContent = practiceRun.status === 'complete' ? '設定へ戻る' : '中止';
+  $('practice-stop').textContent = practiceRun.status === 'complete' ? (practiceRun.fromTour ? '結果を見る' : '設定へ戻る') : '中止';
   updatePracticeClocks();
   if (practiceFriendOpen) $('practice-stage').querySelector('input[name="practice-demo-friend"]')?.focus();
 }
 function updatePracticeClocks() {
   if (practiceRun.stage === 'tour') {
-    const remaining = practiceRun.launchSeconds * 1000 - practiceRun.elapsed();
+    const remaining = practiceRun.launchSeconds * 1000 - practiceRun.sessionElapsed();
     $('practice-countdown').textContent = remaining > 0 ? `開始まで ${(remaining / 1000).toFixed(3)}秒` : `開始から ${(-remaining / 1000).toFixed(3)}秒`;
   }
   $('practice-total-clock').textContent = practiceSeconds(practiceRun.elapsed()); $('practice-step-clock').textContent = practiceSeconds(practiceRun.stageElapsed());
@@ -156,8 +156,8 @@ function closePractice() {
 }
 function practiceResult() {
   const result = practiceRun.result(); closePractice(); $('practice-result').hidden = false;
-  $('practice-result-note').textContent = 'クレカ支払い画面の「支払い内容の確認へ」を押すまでの所要時間です。操作時間からは目標時刻までの待ち時間と待合室の時間を除いています。';
-  $('practice-metrics').innerHTML = [['全体の時間', practiceSeconds(result.totalMs)], ['操作時間（待ち時間を除く）', practiceSeconds(result.operationMs)], ['ボタン操作', `${result.clicks}回`]].map(([label, value]) => `<div class="practice-metric"><span>${label}</span><strong>${value}</strong></div>`).join('');
+  $('practice-result-note').textContent = practiceRun.fromTour ? '開始時刻後にリロードを押した瞬間から、待合室に入るまでの所要時間です。開始前の待ち時間と待合室内の待ち時間は含みません。' : 'クレカ支払い画面の「支払い内容の確認へ」を押すまでの所要時間です。操作時間からは目標時刻までの待ち時間と待合室の時間を除いています。';
+  $('practice-metrics').innerHTML = (practiceRun.fromTour ? [['リロード → 待合室', practiceSeconds(result.totalMs)], ['ボタン操作', `${result.clicks}回`]] : [['全体の時間', practiceSeconds(result.totalMs)], ['操作時間（待ち時間を除く）', practiceSeconds(result.operationMs)], ['ボタン操作', `${result.clicks}回`]]).map(([label, value]) => `<div class="practice-metric"><span>${label}</span><strong>${value}</strong></div>`).join('');
   $('practice-laps').innerHTML = result.laps.map(lap => `<tr><th scope="row">${practiceLabels[lap.stage]}</th><td>${practiceSeconds(lap.milliseconds)}</td></tr>`).join('');
   updatePracticeClocks();
 }
@@ -240,6 +240,10 @@ $('practice-stage').addEventListener('submit', event => { event.preventDefault()
 if (typeof window !== 'undefined') window.addEventListener('message', event => {
   if (practiceRun.status !== 'running' || !['tour','reception'].includes(practiceRun.stage)) return;
   if (event.source !== $('practice-reference-frame').contentWindow) return;
+  if (event.data?.type === 'practice-reference-ready') {
+    if (practiceRun.stage === 'tour') event.source.postMessage({type:'practice-unlock', enabled:practiceRun.applicationVisible}, '*');
+    return;
+  }
   if (practiceRun.stage === 'tour' && event.data?.type === 'practice-tour-apply' && practiceRun.applicationVisible) { practiceRun.tap(); advancePractice('tour'); }
   else if (practiceRun.stage === 'reception' && event.data?.type === 'practice-reception-apply') { practiceRun.tap(); advancePractice('reception'); }
 });
