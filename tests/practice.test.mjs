@@ -111,3 +111,13 @@ test('SHADOWSの申込ボタンは複数ともタップでき、開始前は進�
  assert.match(pages.tour,/id="practice-mobile-reference"/);
  assert.match(pages.reception,/id="practice-reception-mobile"/);
 });
+
+test('申込受付の背景とポップアップは保存HTMLの寸法を使用する',()=>{
+ const pages=JSON.parse(readFileSync(new URL('../src/assets/shadows-reference/pages.json',import.meta.url),'utf8'));
+ assert.doesNotMatch(pages.reception,/practice-popup-width|max-width:960px/);
+ assert.match(pages.reception,/購入注意事項を確認する/);
+ const rules=[...pages.reception.matchAll(/\.popup_entry \.popup_inner\s*\{([^}]*)\}/g)].map(m=>m[1]);
+ assert.ok(rules.some(rule=>/padding:\s*45px/.test(rule)&&/border-radius:\s*32px/.test(rule)&&/max-height:\s*85vh/.test(rule)));
+ assert.ok(rules.some(rule=>/height:\s*100dvh/.test(rule)&&/padding:\s*48px 16px 20px/.test(rule)));
+ assert.match(pages.reception,/\.p-top \.p-section\.entry::before\s*\{[^}]*background:\s*url\("data:image\/png;base64,/);
+});
