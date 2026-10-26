@@ -11,8 +11,7 @@ export async function verifyPublic(directory = path.join(root, 'dist')) {
   const html = await readFile(path.join(directory, 'index.html'), 'utf8');
   const match = html.match(/<script id="payload" type="application\/json">([\s\S]*?)<\/script>/);
   if (!match) {
-    if (!html.includes('function extractEntry') || !html.includes('id="practice-stage"') || /PRACTICE_(?:SCRIPT|STYLE|LOGO|MODEL_SCRIPT)|ENCRYPTED_PAYLOAD/.test(html)) throw new Error('公開用HTMLが正しく組み立てられていません');
-    return { files, format: 'html', bytes: Buffer.byteLength(html), sha256: createHash('sha256').update(html).digest('hex') };
+    throw new Error('公開用HTMLが暗号化されていません。パスワード付きでビルドしてください');
   }
   const payload = JSON.parse(match[1]);
   if (payload.version !== 1 || payload.iterations !== 600000 ||

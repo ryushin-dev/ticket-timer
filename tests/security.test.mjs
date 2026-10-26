@@ -36,13 +36,13 @@ test('公開物にアプリの平文・パスワードを含めない', async ()
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
-test('通常ビルドはパスワード画面なしの単一HTMLと.nojekyllだけを生成する', async () => {
+test('平文HTMLは公開検証で拒否する', async () => {
   const directory = await mkdtemp(path.join(tmpdir(), 'ticket-pages-plain-'));
   try {
     await buildPlain(directory);
     const html = await readFile(path.join(directory, 'index.html'), 'utf8');
     assert.equal(html, await assemble());
     assert.ok(!html.includes('<script id="payload"'));
-    assert.equal((await verifyPublic(directory)).format, 'html');
+    await assert.rejects(verifyPublic(directory), /暗号化されていません/);
   } finally { await rm(directory, { recursive: true, force: true }); }
 });

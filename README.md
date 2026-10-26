@@ -1,6 +1,6 @@
 # Ticket Timer / GitHub Pages
 
-2026/10/23: パスワード画面を廃止し、通常の単一HTMLとして公開する構成に変更しました。最新の練習画面の支払い方法・手数料修正も含みます。
+2026/10/26: パスワード付きの暗号化HTMLに戻しました。
 
 ## ビルドと公開
 
@@ -9,17 +9,13 @@ npm run build
 npm run verify-public
 ```
 
-パスワード入力は不要です。ビルドは `dist/` に加え、リポジトリのルートにも `index.html` と `.nojekyll` を生成します。変更後に `npm run build` を実行し、生成されたルートの2ファイルもコミット・pushしてください。GitHub Pagesは `main` の `/ (root)` を公開します。`dist/` はGit対象外です。
+パスワードを2回入力します（入力は非表示）。パスワードはファイルに保存しません。ビルドは暗号化した `dist/index.html` と `.nojekyll` を生成し、リポジトリのルートにも配置します。ルートの2ファイルをコミット・pushするとGitHub Pagesに反映されます。公開検証は平文HTMLを拒否します。
 
-参考資料の `site/` やHARはアップロードしません。公開URLは https://ryushin-dev.github.io/ticket-timer/ です。
+公開URL: https://ryushin-dev.github.io/ticket-timer/
 
-```sh
-npm run preview
-```
+`npm run preview` は開発用の平文表示、`npm run serve` はパスワード付き公開版の確認です。再読み込み時は再度パスワードを入力します。
 
-ローカル確認は http://localhost:8787 。ビルド済みHTMLの確認は `npm run serve` で行えます。
-
-以下は従来の仕様・公開履歴です。旧パスワード付きビルドの説明は現在の公開手順には適用されません。
+以下は従来の仕様・公開履歴です。
 
 ---
 

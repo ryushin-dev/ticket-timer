@@ -2,6 +2,8 @@ import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { encrypt } from './crypto.mjs';
+import { createInterface } from 'node:readline/promises';
+import { Writable } from 'node:stream';
 export const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export async function assemble() {
   const [template, core, app, practiceHtml, practiceCss, practiceModel, practiceScript, logo, check, countries, queueArt] = await Promise.all(['app.html', 'core.js', 'app.js', 'practice.html', 'practice.css', 'practice-model.js', 'practice.js', 'assets/tixplus-logo.svg', 'assets/queue-check.svg', 'assets/practice-countries.json', 'assets/queue-art.svg'].map(name => readFile(path.join(root, 'src', name), 'utf8')));
@@ -37,7 +39,18 @@ export async function buildPlain(output = path.join(root, 'dist')) {
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    const output = await buildPlain();
+    const muted = new Writable({ write(_chunk, _encoding, callback) { callback(); } });
+    const prompt = createInterface({ input: process.stdin, output: muted, terminal: Boolean(process.stdin.isTTY) });
+    let password;
+    try {
+      process.stderr.write('公開用パスワード: ');
+      password = await prompt.question('');
+      process.stderr.write('\n確認用パスワード: ');
+      const confirmation = await prompt.question('');
+      process.stderr.write('\n');
+      if (password !== confirmation) throw new Error('パスワードが一致しません。');
+    } finally { prompt.close(); }
+    const output = await build(password);
     await writeFile(path.join(root, 'index.html'), await readFile(path.join(output, 'index.html')));
     await writeFile(path.join(root, '.nojekyll'), '');
     console.log(`公開用HTMLを生成しました: ${output}（GitHub Pages用にルートにも配置済み）`);
