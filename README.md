@@ -17,3 +17,4 @@ npm run verify-public
 
 以下は従来の仕様・公開履歴です。
 
+aa
