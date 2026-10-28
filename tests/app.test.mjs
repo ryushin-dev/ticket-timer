@@ -13,28 +13,36 @@ function harness(options = {}) {
   const base = now, events = [], elements = new Map();
   class Clock extends Date { static now() { return now; } }
   function element() { return { dataset: {}, textContent: '', value: '', className: '', tagName: 'INPUT', children: [], listeners: {}, addEventListener(type, callback) { (this.listeners[type] ||= []).push(callback); }, setAttribute(name, value) { this[name] = value; }, replaceChildren(...items) { this.children = items; }, append(...items) { this.children.push(...items); }, reportValidity() { return true; } }; }
+  // realTimersでは並行する時間差取得を実時間で再現する。
+  const timers = options.realTimers ? { Date, setTimeout, clearTimeout } : {
+    Date: Clock, clearTimeout() {},
+    setTimeout(callback, ms) { if (ms === 20000) return {}; options.onWait?.({ elements, events, ms }); queueMicrotask(() => { now += ms; callback(); }); return {}; },
+  };
+  const elapsed = () => (options.realTimers ? Date.now() : now) - base;
   const context = {
-    URL, Date: Clock, performance, console, AbortController, DOMException,
-    document: { getElementById(id) { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); }, createElement: element, querySelectorAll() { return []; }, addEventListener() {} },
-    window: { addEventListener() {} }, location: { assign(href) { events.push(['open', href, now - base]); } },
+    URL, performance, console, AbortController, DOMException, ...timers,
+    document: { head: element(), getElementById(id) { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); }, createElement: element, querySelectorAll() { return []; }, addEventListener() {} },
+    window: { addEventListener() {} }, location: { assign(href) { events.push(['open', href, elapsed()]); } },
     localStorage: { getItem() { return null; }, setItem() {} },
     setInterval() {},
-    setTimeout(callback, ms) { if (ms === 20000) return {}; options.onWait?.({ elements, events, ms }); queueMicrotask(() => { now += ms; callback(); }); return {}; }, clearTimeout() {},
-    async fetch(href, request) {
-      events.push(['fetch', href, now - base]); calls++;
-      assert.equal(request.credentials, 'omit'); assert.equal(request.headers, undefined);
-      if (options.networkError) throw new TypeError('Failed to fetch');
-      return { ok: true, url: href, async text() {
-        if (calls === 1 && options.firstUnpublished) return block('');
-        if (href === cfg.tourUrl) return options.tourHtml || block('/feature/entry');
-        if (options.bodyGate) await options.bodyGate;
-        now += options.bodyDelay || 0;
-        events.push(['body-complete', now - base]);
-        return options.noSeats ? '' : options.receptionHtml || reception;
-      } };
-    },
+    fetch: options.fetch && ((href, request) => { events.push(['fetch', href, elapsed()]); return options.fetch(href, request); }),
+  };
+  context.fetch ||= async function (href, request) {
+    events.push(['fetch', href, now - base]); calls++;
+    assert.equal(request.credentials, 'omit'); assert.equal(request.headers, undefined);
+    if (options.networkError) throw new TypeError('Failed to fetch');
+    return { ok: true, url: href, async text() {
+      if (calls === 1 && options.firstUnpublished) return block('');
+      if (href === cfg.tourUrl) return options.tourHtml || block('/feature/entry');
+      if (options.bodyGate) await options.bodyGate;
+      now += options.bodyDelay || 0;
+      events.push(['body-complete', now - base]);
+      return options.noSeats ? '' : options.receptionHtml || reception;
+    } };
   };
   vm.createContext(context); vm.runInContext(core + '\n' + app, context);
+  // 既存テストは仮の時計で1本ずつ取得する。時間差取得はrealTimersのテストで確認する。
+  if (!options.realTimers) vm.runInContext('hedgeDelays = [0]; hedgeLead = 0', context);
   context.testConfig = { ...cfg, fetchAt: new Date(base + 100).toISOString().replace('Z', '+00:00'), openAt: new Date(base + 200).toISOString().replace('Z', '+00:00') };
   // UI入力と同じJST形式にする。
   context.testConfig.fetchAt = new Date(base + 100 + 9 * 3600000).toISOString().replace('Z', '+09:00');
@@ -47,6 +55,65 @@ test('取得が移動時刻を超えても本文取得・席選択後に移動�
   assert.deepEqual(h.events.at(-1), ['open', url, 600]);
   assert.equal(h.events[0][2], 100);
   assert.equal(h.events.at(-2)[0], 'body-complete');
+});
+// 応答の遅延と本文を呼び出し順に指定するfetch。取り消されたら中断する。
+function delayedFetch(plan) {
+  let calls = 0; const aborted = [];
+  const fetch = (href, request) => {
+    const [delay, body] = plan(href, ++calls), index = calls;
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => resolve({ ok: true, url: href, async text() { return body; } }), delay);
+      request.signal.addEventListener('abort', () => { clearTimeout(timer); aborted.push(index); reject(new DOMException('aborted', 'AbortError')); }, { once: true });
+    });
+  };
+  return { fetch, aborted };
+}
+test('時間差取得は遅い1本目を待たず、先に返った2本目を使って残りを取り消す', async () => {
+  const { fetch, aborted } = delayedFetch((href, call) => href === cfg.tourUrl ? [call === 1 ? 1000 : 20, block('/feature/entry')] : [10, reception]);
+  const h = harness({ realTimers: true, fetch });
+  await h.run(false, true);
+  const tours = h.events.filter(e => e[0] === 'fetch' && e[1] === cfg.tourUrl);
+  assert.equal(tours.length, 2);
+  assert.ok(tours[1][2] >= 190, '2本目は200ms後');
+  assert.deepEqual(aborted, [1]);
+  assert.equal(h.events.filter(e => e[0] === 'fetch' && e[1] !== cfg.tourUrl).length, 1, '受付ページは1本目が速ければ追加取得しない');
+  const opened = h.events.at(-1);
+  assert.equal(opened[1], url); assert.ok(opened[2] < 600, `${opened[2]} ms`);
+});
+test('時間差取得で先に返った未公開は捨て、公開済みの結果を使う', async () => {
+  const { fetch } = delayedFetch((href, call) => href === cfg.tourUrl ? (call === 1 ? [10, block('')] : [10, block('/feature/entry')]) : [10, reception]);
+  const h = harness({ realTimers: true, fetch });
+  await h.run(false, true);
+  assert.equal(h.events.filter(e => e[0] === 'fetch' && e[1] === cfg.tourUrl).length, 2);
+  assert.equal(h.events.at(-1)[1], url);
+});
+test('時間差取得が全て未公開なら、再取得は1本ずつ行う', async () => {
+  const { fetch } = delayedFetch((href, call) => href === cfg.tourUrl ? [5, block(call <= 3 ? '' : '/feature/entry')] : [5, reception]);
+  const h = harness({ realTimers: true, fetch });
+  await h.run(false, true);
+  assert.equal(h.events.filter(e => e[0] === 'fetch' && e[1] === cfg.tourUrl).length, 4);
+  assert.equal(h.events.at(-1)[1], url);
+});
+test('予約は取得日時の少し前から時間差で取得し、事前に接続を開く', async () => {
+  const { fetch } = delayedFetch(href => [5, href === cfg.tourUrl ? block('/feature/entry') : reception]);
+  const h = harness({ realTimers: true, fetch });
+  h.context.testConfig.fetchAt = new Date(Date.now() + 400 + 9 * 3600000).toISOString().replace('Z', '+09:00');
+  h.context.testConfig.openAt = h.context.testConfig.fetchAt;
+  const started = Date.now();
+  await h.run();
+  const first = h.events.find(e => e[0] === 'fetch');
+  assert.ok(Date.now() - started >= 200 && first[2] < 400 - 150, `1本目 ${first[2]} ms`);
+  const links = h.context.document.head.children.map(link => [link.rel, link.href, link.crossOrigin]);
+  assert.deepEqual(links.slice(0, 2), [['preconnect', 'https://mrsgreenapple.com', 'anonymous'], ['preconnect', 'https://tixplus.jp', undefined]]);
+  assert.deepEqual(links.at(-1), ['preconnect', 'https://tixplus.jp', undefined], '受付ページ取得前に遷移先へ接続し直す');
+  assert.equal(h.events.at(-1)[1], url);
+});
+test('一覧確認は時間差取得も接続準備もしない', async () => {
+  const { fetch } = delayedFetch(href => [5, href === cfg.tourUrl ? block('/feature/entry') : reception]);
+  const h = harness({ realTimers: true, fetch });
+  await h.run(true);
+  assert.equal(h.events.filter(e => e[0] === 'fetch').length, 2);
+  assert.equal(h.context.document.head.children.length, 0);
 });
 test('取得が早ければ移動時刻まで待つ', async () => {
   const h = harness(); await h.run(); assert.deepEqual(h.events.at(-1), ['open', url, 200]);

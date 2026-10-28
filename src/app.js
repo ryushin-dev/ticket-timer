@@ -5,6 +5,10 @@ let countdownTarget = null;
 let receptionEntries = [];
 let preferredDateIso = '';
 let preferredSeat = '';
+// 混雑時は同じ取得でも応答時間が大きくばらつくため、時間差で複数回取得して最初に使える結果を採用する。
+let hedgeDelays = [0, 200, 500];
+let hedgeLead = 200; // 予約時は取得日時のこの時間前に1本目を出す
+const warmOrigins = [['https://mrsgreenapple.com', 'anonymous'], ['https://tixplus.jp', '']];
 function jst(ms) { return new Date(ms + 9 * 3600000).toISOString().replace('Z', '+09:00'); }
 function log(message) {
   const box = $('log');
@@ -117,9 +121,18 @@ async function waitUntil(target, signal) {
   }
   signal.throwIfAborted();
 }
-async function fetchHtml(url, signal) {
+// 待機中に接続(TLS)を開いておく。使われない接続は10秒ほどで閉じられるので直前に呼ぶ。
+// 公式サイトはcredentials: 'omit'のfetch用にanonymous、tixplusは通常の画面遷移用。
+function warmConnections(origins = warmOrigins) {
+  for (const [href, crossOrigin] of origins) {
+    const link = document.createElement('link'); link.rel = 'preconnect'; link.href = href;
+    if (crossOrigin) link.crossOrigin = crossOrigin;
+    document.head.append(link);
+  }
+}
+async function fetchHtml(url, signal, label = '') {
   const started = performance.now();
-  log(`HTML取得開始: ${url}`);
+  log(`HTML取得開始${label}: ${url}`);
   const controller = new AbortController();
   const abort = () => controller.abort();
   signal.addEventListener('abort', abort, { once: true });
@@ -131,7 +144,7 @@ async function fetchHtml(url, signal) {
     if (new URL(response.url).origin !== 'https://mrsgreenapple.com') throw new Error('公式サイト外へ転送されました。');
     const html = await response.text();
     signal.throwIfAborted();
-    log(`HTML取得完了: ${(performance.now() - started).toFixed(1)} ms`);
+    log(`HTML取得完了${label}: ${(performance.now() - started).toFixed(1)} ms`);
     return html;
   } catch (error) {
     signal.throwIfAborted();
@@ -139,6 +152,28 @@ async function fetchHtml(url, signal) {
     if (error.name === 'TypeError') throw new Error('HTMLを取得できません。通信状態・CORS許可を確認してください。');
     throw error;
   } finally { clearTimeout(timeout); signal.removeEventListener('abort', abort); }
+}
+// delaysの時間差で取得し、acceptが成功した最初の結果を返して残りは取り消す。
+// 全て失敗したら未公開(UNPUBLISHED)を優先して返し、呼び出し側の再取得判定に使う。
+function fetchFirst(url, signal, accept, delays = hedgeDelays) {
+  const group = new AbortController();
+  const stop = () => group.abort(signal.reason);
+  signal.addEventListener('abort', stop, { once: true });
+  if (signal.aborted) stop();
+  return new Promise((resolve, reject) => {
+    const errors = [];
+    delays.forEach((delay, i) => {
+      const label = delays.length > 1 ? `(${i + 1}/${delays.length})` : '';
+      sleep(delay, group.signal).then(() => fetchHtml(url, group.signal, label)).then(html => {
+        if (group.signal.aborted) return;
+        const result = accept(html);
+        group.abort(); resolve({ html, result });
+      }).catch(error => {
+        errors.push(error);
+        if (errors.length === delays.length) reject(signal.aborted ? errors[0] : errors.find(item => item.code === 'UNPUBLISHED') || errors[0]);
+      });
+    });
+  }).finally(() => { group.abort(); signal.removeEventListener('abort', stop); });
 }
 function showCandidates(info, cfg) {
   const list = $('candidates');
@@ -209,22 +244,24 @@ async function loadReceptions() {
   } catch (error) { $('reception-note').textContent = error.message; }
   finally { job = null; $('load-receptions').disabled = false; $('schedule').disabled = false; $('check').disabled = false; $('open-now').disabled = false; $('cancel').disabled = true; }
 }
-async function resolveReception(cfg, signal) {
-  let entry;
+async function resolveReception(cfg, signal, preview = false) {
+  let entry, tourHtml;
   for (let attempt = 1; attempt <= cfg.discoveryAttempts; attempt++) {
     signal.throwIfAborted();
-    const tourHtml = await fetchHtml(cfg.tourUrl, signal);
-    renderReceptions(tourHtml, cfg.tourUrl, cfg.receptionName);
-    try { entry = extractEntry(tourHtml, cfg); break; }
+    // 時間差取得は初回だけ。未公開時の再取得は1本ずつにしてサーバー負荷を抑える。
+    try { ({ html: tourHtml, result: entry } = await fetchFirst(cfg.tourUrl, signal, html => extractEntry(html, cfg), preview || attempt > 1 ? [0] : hedgeDelays)); break; }
     catch (error) {
       if (error.code !== 'UNPUBLISHED' || attempt === cfg.discoveryAttempts) throw error;
       log(`未公開。${cfg.discoveryIntervalMs} ms後に再取得 (${attempt}/${cfg.discoveryAttempts})`);
       await sleep(cfg.discoveryIntervalMs, signal);
     }
   }
+  renderReceptions(tourHtml, cfg.tourUrl, cfg.receptionName);
   log(`受付: ${entry.name}`); log(`申込リンク: ${entry.url}`);
   if (entry.destination === 'pia') return { externalEntry: entry, links: [] };
-  const info = extractReception(await fetchHtml(entry.url, signal));
+  // ツアーページの取得が長引くと待機中に開いた接続が閉じるため、遷移先への接続を開き直す。
+  if (!preview) warmConnections(warmOrigins.slice(1));
+  const { result: info } = await fetchFirst(entry.url, signal, extractReception, preview ? [0] : hedgeDelays);
   signal.throwIfAborted();
   log(`受付ページ: ${info.reception}`);
   return info;
@@ -241,12 +278,15 @@ async function execute(cfg, preview, signal, immediate = false) {
   if (scheduled) {
     countdownTarget = fetchTarget;
     state('HTML取得まで待機中', `取得: ${cfg.fetchAt}`, 'WAITING');
-    await waitUntil(fetchTarget, signal);
-    log(`取得予定との差: +${Date.now() - fetchTarget} ms`);
-  }
+    const firstFetch = fetchTarget - hedgeLead;
+    await waitUntil(firstFetch - 3000, signal);
+    warmConnections();
+    await waitUntil(firstFetch, signal);
+    log(`取得予定との差: +${Date.now() - firstFetch} ms（取得日時の${hedgeLead} ms前から${hedgeDelays.length}本を時間差で取得）`);
+  } else if (!preview) warmConnections();
   countdownTarget = null;
   state('受付と席を取得中', 'ツアーページから対象の受付を探しています。', 'FETCHING');
-  const info = await resolveReception(cfg, signal);
+  const info = await resolveReception(cfg, signal, preview);
   if (info.externalEntry) {
     const entry = info.externalEntry;
     $('candidates').replaceChildren(); $('candidates-section').className = '';
