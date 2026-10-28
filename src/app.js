@@ -6,7 +6,7 @@ let receptionEntries = [];
 let preferredDateIso = '';
 let preferredSeat = '';
 // 混雑時は同じ取得でも応答時間が大きくばらつくため、時間差で複数回取得して最初に使える結果を採用する。
-let hedgeDelays = [0, 200, 500];
+let hedgeDelays = [0, 200, 400, 700, 1000];
 let hedgeLead = 200; // 予約時は取得日時のこの時間前に1本目を出す
 const warmOrigins = [['https://mrsgreenapple.com', 'anonymous'], ['https://tixplus.jp', '']];
 function jst(ms) { return new Date(ms + 9 * 3600000).toISOString().replace('Z', '+09:00'); }
@@ -249,7 +249,7 @@ async function resolveReception(cfg, signal, preview = false) {
   for (let attempt = 1; attempt <= cfg.discoveryAttempts; attempt++) {
     signal.throwIfAborted();
     // 時間差取得は初回だけ。未公開時の再取得は1本ずつにしてサーバー負荷を抑える。
-    try { ({ html: tourHtml, result: entry } = await fetchFirst(cfg.tourUrl, signal, html => extractEntry(html, cfg), preview || attempt > 1 ? [0] : hedgeDelays)); break; }
+    try { ({ html: tourHtml, result: entry } = await fetchFirst(cfg.tourUrl, signal, html => extractEntry(html, cfg), attempt > 1 ? [0] : hedgeDelays)); break; }
     catch (error) {
       if (error.code !== 'UNPUBLISHED' || attempt === cfg.discoveryAttempts) throw error;
       log(`未公開。${cfg.discoveryIntervalMs} ms後に再取得 (${attempt}/${cfg.discoveryAttempts})`);
@@ -261,7 +261,7 @@ async function resolveReception(cfg, signal, preview = false) {
   if (entry.destination === 'pia') return { externalEntry: entry, links: [] };
   // ツアーページの取得が長引くと待機中に開いた接続が閉じるため、遷移先への接続を開き直す。
   if (!preview) warmConnections(warmOrigins.slice(1));
-  const { result: info } = await fetchFirst(entry.url, signal, extractReception, preview ? [0] : hedgeDelays);
+  const { result: info } = await fetchFirst(entry.url, signal, extractReception);
   signal.throwIfAborted();
   log(`受付ページ: ${info.reception}`);
   return info;

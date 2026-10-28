@@ -88,10 +88,10 @@ test('時間差取得で先に返った未公開は捨て、公開済みの結�
   assert.equal(h.events.at(-1)[1], url);
 });
 test('時間差取得が全て未公開なら、再取得は1本ずつ行う', async () => {
-  const { fetch } = delayedFetch((href, call) => href === cfg.tourUrl ? [5, block(call <= 3 ? '' : '/feature/entry')] : [5, reception]);
+  const { fetch } = delayedFetch((href, call) => href === cfg.tourUrl ? [5, block(call <= 5 ? '' : '/feature/entry')] : [5, reception]);
   const h = harness({ realTimers: true, fetch });
   await h.run(false, true);
-  assert.equal(h.events.filter(e => e[0] === 'fetch' && e[1] === cfg.tourUrl).length, 4);
+  assert.equal(h.events.filter(e => e[0] === 'fetch' && e[1] === cfg.tourUrl).length, 6);
   assert.equal(h.events.at(-1)[1], url);
 });
 test('予約は取得日時の少し前から時間差で取得し、事前に接続を開く', async () => {
@@ -108,11 +108,14 @@ test('予約は取得日時の少し前から時間差で取得し、事前に�
   assert.deepEqual(links.at(-1), ['preconnect', 'https://tixplus.jp', undefined], '受付ページ取得前に遷移先へ接続し直す');
   assert.equal(h.events.at(-1)[1], url);
 });
-test('一覧確認は時間差取得も接続準備もしない', async () => {
-  const { fetch } = delayedFetch(href => [5, href === cfg.tourUrl ? block('/feature/entry') : reception]);
+test('一覧確認も時間差で取得するが、移動しないので接続準備はしない', async () => {
+  const { fetch, aborted } = delayedFetch((href, call) => [call === 1 ? 1000 : 20, href === cfg.tourUrl ? block('/feature/entry') : reception]);
   const h = harness({ realTimers: true, fetch });
   await h.run(true);
-  assert.equal(h.events.filter(e => e[0] === 'fetch').length, 2);
+  assert.equal(h.events.filter(e => e[0] === 'fetch' && e[1] === cfg.tourUrl).length, 2);
+  assert.deepEqual(aborted, [1]);
+  assert.equal(h.elements.get('candidates').children.length, 1);
+  assert.ok(!h.events.some(e => e[0] === 'open'));
   assert.equal(h.context.document.head.children.length, 0);
 });
 test('取得が早ければ移動時刻まで待つ', async () => {
