@@ -205,7 +205,7 @@ function selectedReception() {
 }
 function setOfficialStart(entry) {
   if (!entry?.startAt) return;
-  restoreTime('fetch', jst(Date.parse(entry.startAt) + 100));
+  restoreTime('fetch', jst(Date.parse(entry.startAt)));
   timeChanged();
 }
 function applyReception(entry, applyStart = false) {
@@ -213,7 +213,7 @@ function applyReception(entry, applyStart = false) {
   populateChoices('performanceDate', (entry?.dates || []).map(date => ({ value: date.iso, label: date.label })), desiredDate, '公演日を選択');
   populateChoices('seatName', (entry?.seats || []).map(seat => ({ value: seat, label: seat + (seat.includes('着席') ? ' (着席)' : '') })), desiredSeat, '席種を選択');
   $('selection-note').textContent = entry ? (!entry.dates.length || !entry.seats.length ? '対象公演・対象席種を読み取れませんでした。公式ページを確認してください。' : (entry.destination === 'pia' ? 'チケットぴあ受付です。このツールは申込サイトへの移動まで行い、公演日・席種は遷移先で選択します。' : '選択した受付の対象公演・対象席種だけを表示しています。')) : 'まず公式ページの受付一覧を取得してください。';
-  $('official-start').textContent = entry?.startAt ? `販売開始: ${entry.startAt.replace('T', ' ').replace('.000+09:00', ' JST')} / 取得時刻に＋0.1秒を設定` : '販売開始日時が読み取れない場合は手動で設定してください。';
+  $('official-start').textContent = entry?.startAt ? `販売開始: ${entry.startAt.replace('T', ' ').replace('.000+09:00', ' JST')} / 取得時刻に販売開始時刻を設定` : '販売開始日時が読み取れない場合は手動で設定してください。';
   $('use-official-start').disabled = !entry?.startAt;
   if (applyStart) setOfficialStart(entry);
 }

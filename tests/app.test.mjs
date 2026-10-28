@@ -233,9 +233,9 @@ test('受付ごとの公演日と席種に絞り、対象外の保存設定は�
   assert.deepEqual(h.elements.get('seatName').children.map(option => option.value), ['', '注釈付き指定席', '注釈付き着席指定席']);
   assert.equal(h.elements.get('performanceDate').value, '2026-10-15');
   assert.deepEqual(h.elements.get('performanceDate').children.map(option => option.value), ['', '2026-10-14', '2026-10-15']);
-  assert.equal(Number(h.elements.get('fetchMs').value), 100);
+  assert.equal(Number(h.elements.get('fetchMs').value), 0);
   assert.equal(h.elements.get('fetchDate').value, '2026-10-12');
-  assert.equal(h.elements.get('open-time-view').textContent, '14:00:03.100');
+  assert.equal(h.elements.get('open-time-view').textContent, '14:00:03.000');
 });
 test('予約時の再取得では手動調整した時刻を上書きせず、開始不明も上書きしない', () => {
   const h = harness();
